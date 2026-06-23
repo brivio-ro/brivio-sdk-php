@@ -7,6 +7,7 @@ namespace Brivio\Tests;
 use Brivio\Legacy\Fgo;
 use Brivio\Legacy\Oblio;
 use Brivio\Legacy\SmartBill;
+use Brivio\Legacy\Facturis;
 use Brivio\Tests\Support\FakeTransport;
 use PHPUnit\Framework\TestCase;
 
@@ -86,5 +87,44 @@ final class LegacyShimTest extends TestCase
         $oblio->nomenclature('clients');
 
         self::assertSame('https://api.example/v1/contacts', $t->url);
+    }
+
+    public function testFacturisSaveInvoiceMapsSnakeCaseFields(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'inv4'], 'error' => null], 201);
+        $f = new Facturis('k', 'https://api.example/v1', $t);
+        $f->setCui('RO123');
+
+        $f->saveInvoice([
+            'serie' => 'FAC',
+            'client_name' => 'Gamma SRL',
+            'client_cui' => 'RO321',
+            'moneda' => 'RON',
+            'trimite_efactura' => true,
+            'products' => [
+                ['denumire' => 'Abonament', 'cantitate' => 2, 'pret' => 40, 'cota_tva' => 21, 'tip' => 'serviciu'],
+            ],
+        ]);
+
+        $body = $t->decodedBody();
+        self::assertSame('https://api.example/v1/invoices', $t->url);
+        self::assertSame('RO123', $body['seller_vat_code']);
+        self::assertSame('FAC', $body['series_name']);
+        self::assertSame('Gamma SRL', $body['client']['name']);
+        self::assertSame('RO321', $body['client']['vat_number']);
+        self::assertSame('Abonament', $body['lines'][0]['name']);
+        self::assertSame(2.0, $body['lines'][0]['quantity']);
+        self::assertSame(21.0, $body['lines'][0]['vat_rate']);
+        self::assertTrue($body['lines'][0]['is_service']);
+        self::assertTrue($body['send_to_spv']);
+    }
+
+    public function testFacturisSaveProductHitsArticles(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'art1'], 'error' => null], 201);
+        $f = new Facturis('k', 'https://api.example/v1', $t);
+        $f->saveProduct(['denumire' => 'Tuns', 'pret' => 50, 'cota_tva' => 21, 'tip' => 'serviciu']);
+
+        self::assertSame('https://api.example/v1/articles', $t->url);
     }
 }

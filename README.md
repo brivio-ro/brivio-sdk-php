@@ -2,7 +2,7 @@
 
 Official PHP SDK for the [Brivio](https://brivio.ro) public API — invoicing,
 contacts, articles, locations and module entitlements — plus **drop-in
-compatibility shims** so you can migrate from **FGO**, **SmartBill** or **Oblio**
+compatibility shims** so you can migrate from **FGO**, **SmartBill**, **Oblio** or **Facturis**
 with minimal code changes.
 
 ## Install
@@ -90,6 +90,25 @@ $api->createInvoice([
 ```
 
 Mapped methods: `createInvoice`, `createProforma`, `nomenclature('clients'|'products')`.
+
+### Facturis Online
+
+```php
+$api = new \Brivio\Legacy\Facturis('brivio_sk_live_...');
+$api->setCui('RO123');
+
+$api->saveInvoice([
+    'serie' => 'FAC',
+    'client_name' => 'Gamma SRL',
+    'client_cui' => 'RO321',
+    'trimite_efactura' => true,
+    'products' => [
+        ['denumire' => 'Abonament', 'cantitate' => 2, 'pret' => 40, 'cota_tva' => 21, 'tip' => 'serviciu'],
+    ],
+]);
+```
+
+Mapped methods: `saveInvoice`, `saveProforma`, `listInvoices`, `saveClient`, `saveProduct`.
 
 > The shims cover the **core invoice / contact / article** flows. Less common
 > provider methods are intentionally not shimmed; use the native `BrivioClient`
