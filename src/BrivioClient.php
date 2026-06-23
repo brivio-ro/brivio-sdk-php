@@ -176,6 +176,78 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Projects ──────────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listProjects(array $params = []): array
+    {
+        $res = $this->http->get('/projects', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createProject(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/projects', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Expenses ──────────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listExpenses(array $params = []): array
+    {
+        $res = $this->http->get('/expenses', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createExpense(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/expenses', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Contracts ─────────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listContracts(array $params = []): array
+    {
+        $res = $this->http->get('/contracts', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createContract(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/contracts', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
     // ── Modules ───────────────────────────────────────────────────────
     /** @return list<array<string,mixed>> */
     public function listModules(?string $locationId = null): array
