@@ -43,6 +43,19 @@ $brivio->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1']);
 
 Errors throw `\Brivio\BrivioException` (`->errorCode`, `->status`, `->details`).
 
+## API surfaces
+
+Two backends serve the API behind the same key. Core data resources
+(`contacts`, `articles`, `invoices`, `documents`, `projects`, `expenses`,
+`contracts`, …) use the gateway (`https://api.brivio.ro/v1`, the default).
+Stripe/KMS-bound resources (`charge`, catalog, subscriptions) must use the app
+surface:
+
+```php
+$billing = new \Brivio\BrivioClient('brivio_sk_live_...', 'https://app.brivio.ro/api/v1');
+$billing->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1']);
+```
+
 ## Migrating from a competitor (legacy shims)
 
 The `\Brivio\Legacy\*` classes accept the **same payload shape** as the original
