@@ -112,4 +112,55 @@ final class BrivioClientTest extends TestCase
         self::assertSame('idem-pay', $t->headers['Idempotency-Key']);
         self::assertSame('pi_1', $r['payment_intent_id']);
     }
+
+    public function testListAndCreateProject(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'p1', 'name' => 'P1'], 'error' => null], 201);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $p = $client->createProject(['name' => 'P1']);
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/projects', (string) $t->url);
+        self::assertSame('p1', $p['id']);
+    }
+
+    public function testListProjectsSendsQuery(): void
+    {
+        $t = new FakeTransport(['data' => [], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->listProjects(['status' => 'ACTIVE']);
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/projects', (string) $t->url);
+        self::assertStringContainsString('status=ACTIVE', (string) $t->url);
+    }
+
+    public function testCreateExpensePostsBody(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'e1'], 'error' => null], 201);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $e = $client->createExpense(['description' => 'E1', 'amount' => 50, 'expense_date' => '2026-01-15']);
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/expenses', (string) $t->url);
+        self::assertSame('e1', $e['id']);
+    }
+
+    public function testCreateContractPostsBody(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'k1', 'name' => 'C1'], 'error' => null], 201);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $k = $client->createContract(['name' => 'C1']);
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/contracts', (string) $t->url);
+        self::assertSame('k1', $k['id']);
+    }
+
+    public function testListExpensesAndContracts(): void
+    {
+        $t = new FakeTransport(['data' => [], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->listExpenses(['category' => 'OFFICE']);
+        self::assertStringContainsString('/expenses', (string) $t->url);
+        self::assertStringContainsString('category=OFFICE', (string) $t->url);
+        $client->listContracts(['status' => 'DRAFT']);
+        self::assertStringContainsString('/contracts', (string) $t->url);
+    }
 }
