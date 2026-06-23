@@ -128,6 +128,54 @@ final class BrivioClient
         return ['data' => $data, 'meta' => $res['meta'] ?? []];
     }
 
+    /** @return array<string,mixed> */
+    public function getInvoice(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/invoices/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateInvoice(string $id, array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/invoices/' . rawurlencode($id), $input)['data'];
+        return $data;
+    }
+
+    public function deleteInvoice(string $id): void
+    {
+        $this->http->delete('/invoices/' . rawurlencode($id));
+    }
+
+    /**
+     * Submit an issued invoice to RO e-Factura (ANAF).
+     * @return array<string,mixed>
+     */
+    public function submitInvoiceToANAF(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/invoices/' . rawurlencode($id) . '/submit-efactura', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Payments ──────────────────────────────────────────────────────
+    /**
+     * Create a PaymentIntent (own Stripe or Brivio Connect).
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function charge(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/payments/charge', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
     // ── Modules ───────────────────────────────────────────────────────
     /** @return list<array<string,mixed>> */
     public function listModules(?string $locationId = null): array

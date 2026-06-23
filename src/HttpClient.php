@@ -57,6 +57,23 @@ final class HttpClient
     }
 
     /**
+     * @param array<string, mixed> $body
+     * @return array{data: mixed, meta?: array<string,mixed>}
+     */
+    public function patch(string $path, array $body, ?string $idempotencyKey = null): array
+    {
+        return $this->request('PATCH', $path, json_encode($body, JSON_THROW_ON_ERROR), $idempotencyKey);
+    }
+
+    /**
+     * @return array{data: mixed, meta?: array<string,mixed>}
+     */
+    public function delete(string $path): array
+    {
+        return $this->request('DELETE', $path, null);
+    }
+
+    /**
      * @return array{data: mixed, meta?: array<string,mixed>}
      */
     private function request(string $method, string $path, ?string $body, ?string $idempotencyKey = null): array

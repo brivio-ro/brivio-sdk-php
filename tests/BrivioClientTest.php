@@ -56,4 +56,60 @@ final class BrivioClientTest extends TestCase
         $this->expectException(BrivioException::class);
         $client->createContact(['name' => '']);
     }
+
+    public function testGetInvoiceUsesPathId(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'i9', 'number' => 9], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $inv = $client->getInvoice('i9');
+
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/invoices/i9', (string) $t->url);
+        self::assertSame('i9', $inv['id']);
+    }
+
+    public function testUpdateInvoicePatches(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'i3', 'status' => 'SENT'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->updateInvoice('i3', ['status' => 'SENT']);
+
+        self::assertSame('PATCH', $t->method);
+        self::assertStringContainsString('/invoices/i3', (string) $t->url);
+        self::assertSame('SENT', $t->decodedBody()['status']);
+    }
+
+    public function testDeleteInvoiceUsesDeleteVerb(): void
+    {
+        $t = new FakeTransport(['data' => null, 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->deleteInvoice('i3');
+
+        self::assertSame('DELETE', $t->method);
+        self::assertStringContainsString('/invoices/i3', (string) $t->url);
+    }
+
+    public function testSubmitInvoiceToAnaf(): void
+    {
+        $t = new FakeTransport(['data' => ['status' => 'uploaded'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->submitInvoiceToANAF('i4', 'idem-anaf');
+
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/invoices/i4/submit-efactura', (string) $t->url);
+        self::assertSame('idem-anaf', $t->headers['Idempotency-Key']);
+        self::assertSame('uploaded', $r['status']);
+    }
+
+    public function testChargeCreatesPaymentIntent(): void
+    {
+        $t = new FakeTransport(['data' => ['payment_intent_id' => 'pi_1', 'status' => 'requires_payment_method'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1'], 'idem-pay');
+
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/payments/charge', (string) $t->url);
+        self::assertSame('idem-pay', $t->headers['Idempotency-Key']);
+        self::assertSame('pi_1', $r['payment_intent_id']);
+    }
 }

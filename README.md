@@ -32,6 +32,15 @@ $invoice = $brivio->createInvoice([
 ], idempotencyKey: 'order-42'); // optional idempotency
 ```
 
+Invoices, payments and e-Factura:
+
+```php
+$invoice = $brivio->getInvoice($id);
+$brivio->updateInvoice($id, ['status' => 'SENT']);
+$brivio->submitInvoiceToANAF($id);              // RO e-Factura
+$brivio->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1']);
+```
+
 Errors throw `\Brivio\BrivioException` (`->errorCode`, `->status`, `->details`).
 
 ## Migrating from a competitor (legacy shims)
