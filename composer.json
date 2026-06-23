@@ -4,6 +4,14 @@
     "type": "library",
     "license": "MIT",
     "keywords": ["brivio", "e-factura", "invoicing", "romania", "anaf", "smartbill", "fgo", "oblio"],
+    "homepage": "https://brivio.ro",
+    "support": {
+        "issues": "https://github.com/dragoscv/brivio/issues",
+        "docs": "https://brivio.ro/developers/docs"
+    },
+    "authors": [
+        { "name": "Brivio", "homepage": "https://brivio.ro" }
+    ],
     "require": {
         "php": ">=8.2",
         "ext-json": "*",
