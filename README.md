@@ -64,6 +64,16 @@ $deliveries = $brivio->listWebhookDeliveries($hook['id'], ['status' => 'failed']
 $brivio->rotateWebhookSecret($hook['id']);  // returns new secret once
 ```
 
+Inventory & HR:
+
+```php
+$stock = $brivio->listStockLevels(['below_min' => 'true']);   // low-stock report
+$moves = $brivio->listStockMovements(['type' => 'SALE']);
+$nirs  = $brivio->listNirDocuments(['status' => 'CONFIRMED']);
+$nir   = $brivio->getNirDocument($nirs['data'][0]['id']);      // with line items
+$staff = $brivio->listEmployees(['department' => 'Vanzari']);  // PII never exposed
+```
+
 ## API surfaces
 
 Two backends serve the API behind the same key. Core data resources

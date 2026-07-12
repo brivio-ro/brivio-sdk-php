@@ -330,6 +330,72 @@ final class BrivioClient
         return ['data' => $data, 'meta' => $res['meta'] ?? []];
     }
 
+    // ── Inventory ─────────────────────────────────────────────────────
+    /**
+     * Current stock levels for stock-tracked articles.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listStockLevels(array $params = []): array
+    {
+        $res = $this->http->get('/inventory/stock', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Stock movement history.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listStockMovements(array $params = []): array
+    {
+        $res = $this->http->get('/inventory/movements', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * List goods receipt notes (NIR).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listNirDocuments(array $params = []): array
+    {
+        $res = $this->http->get('/inventory/nir', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function getNirDocument(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/inventory/nir/' . $id)['data'];
+        return $data;
+    }
+
+    // ── HR ────────────────────────────────────────────────────────────
+    /**
+     * Employee directory. PII (CNP, IBAN, address) is never exposed.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listEmployees(array $params = []): array
+    {
+        $res = $this->http->get('/hr/employees', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
      * Optionally pass the X-Brivio-Timestamp header value to enforce a replay

@@ -213,4 +213,24 @@ final class BrivioClientTest extends TestCase
         // Fresh timestamp accepted
         self::assertTrue(BrivioClient::verifyWebhookSignature($payload, $sig, $secret, (string) time()));
     }
+
+    public function testInventoryAndHrPaths(): void
+    {
+        $t = new FakeTransport(['data' => [], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listStockLevels(['below_min' => 'true']);
+        self::assertStringContainsString('/inventory/stock', (string) $t->url);
+        self::assertStringContainsString('below_min=true', (string) $t->url);
+
+        $client->listStockMovements(['type' => 'SALE']);
+        self::assertStringContainsString('/inventory/movements', (string) $t->url);
+
+        $client->listNirDocuments(['status' => 'CONFIRMED']);
+        self::assertStringContainsString('/inventory/nir', (string) $t->url);
+        self::assertStringContainsString('status=CONFIRMED', (string) $t->url);
+
+        $client->listEmployees(['department' => 'Vanzari']);
+        self::assertStringContainsString('/hr/employees', (string) $t->url);
+    }
 }
