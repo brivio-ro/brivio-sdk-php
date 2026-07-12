@@ -43,6 +43,27 @@ $brivio->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1']);
 
 Errors throw `\Brivio\BrivioException` (`->errorCode`, `->status`, `->details`).
 
+Webhooks:
+
+```php
+$hook = $brivio->createWebhook([
+    'url' => 'https://app.example/hooks/brivio',
+    'events' => ['invoice.paid', 'contact.created'],
+]);
+// $hook['secret'] is returned ONCE — store it for signature verification.
+
+// Incoming webhook verification (raw body + headers):
+$ok = \Brivio\BrivioClient::verifyWebhookSignature(
+    $rawBody,
+    $_SERVER['HTTP_X_BRIVIO_SIGNATURE'],   // "sha256=<hex>"
+    $secret,
+    $_SERVER['HTTP_X_BRIVIO_TIMESTAMP'],   // optional replay protection
+);
+
+$deliveries = $brivio->listWebhookDeliveries($hook['id'], ['status' => 'failed']);
+$brivio->rotateWebhookSecret($hook['id']);  // returns new secret once
+```
+
 ## API surfaces
 
 Two backends serve the API behind the same key. Core data resources

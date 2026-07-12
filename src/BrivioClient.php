@@ -256,4 +256,100 @@ final class BrivioClient
         $data = $this->http->get('/modules', $locationId !== null ? ['location_id' => $locationId] : [])['data'] ?? [];
         return $data;
     }
+
+    // ── Webhooks ──────────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listWebhooks(array $params = []): array
+    {
+        $res = $this->http->get('/webhooks', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Register a webhook endpoint. The returned array contains `secret`
+     * exactly once — persist it for signature verification.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createWebhook(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/webhooks', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function getWebhook(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/webhooks/' . $id)['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateWebhook(string $id, array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/webhooks/' . $id, $input)['data'];
+        return $data;
+    }
+
+    /** Rotate the signing secret; response contains the new `secret`.
+     * @return array<string,mixed>
+     */
+    public function rotateWebhookSecret(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/webhooks/' . $id, ['rotate_secret' => true])['data'];
+        return $data;
+    }
+
+    public function deleteWebhook(string $id): void
+    {
+        $this->http->delete('/webhooks/' . $id);
+    }
+
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listWebhookDeliveries(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/webhooks/' . $id . '/deliveries', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
+     * Optionally pass the X-Brivio-Timestamp header value to enforce a replay
+     * window (default ± 300 seconds).
+     */
+    public static function verifyWebhookSignature(
+        string $payload,
+        string $signatureHeader,
+        string $secret,
+        ?string $timestampHeader = null,
+        int $toleranceSec = 300,
+    ): bool {
+        if ($timestampHeader !== null) {
+            $ts = (int) $timestampHeader;
+            if ($ts === 0 || abs(time() - $ts) > $toleranceSec) {
+                return false;
+            }
+        }
+        $actual = preg_replace('/^sha256=/', '', $signatureHeader) ?? '';
+        $expected = hash_hmac('sha256', $payload, $secret);
+        return hash_equals($expected, $actual);
+    }
 }

@@ -163,4 +163,54 @@ final class BrivioClientTest extends TestCase
         $client->listContracts(['status' => 'DRAFT']);
         self::assertStringContainsString('/contracts', (string) $t->url);
     }
+
+    public function testCreateWebhookReturnsSecret(): void
+    {
+        $t = new FakeTransport(
+            ['data' => ['id' => 'wh1', 'url' => 'https://app/wh', 'secret' => 'whsec_x', 'events' => ['invoice.paid']], 'error' => null],
+            201,
+        );
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $wh = $client->createWebhook(['url' => 'https://app/wh', 'events' => ['invoice.paid']]);
+
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/webhooks', (string) $t->url);
+        self::assertSame('whsec_x', $wh['secret']);
+    }
+
+    public function testRotateWebhookSecretPatchesFlag(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'wh2', 'secret' => 'whsec_new'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $wh = $client->rotateWebhookSecret('wh2');
+
+        self::assertSame('PATCH', $t->method);
+        self::assertTrue($t->decodedBody()['rotate_secret']);
+        self::assertSame('whsec_new', $wh['secret']);
+    }
+
+    public function testListWebhookDeliveriesBuildsPath(): void
+    {
+        $t = new FakeTransport(['data' => [], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->listWebhookDeliveries('wh3', ['status' => 'failed']);
+
+        self::assertStringContainsString('/webhooks/wh3/deliveries', (string) $t->url);
+        self::assertStringContainsString('status=failed', (string) $t->url);
+    }
+
+    public function testVerifyWebhookSignature(): void
+    {
+        $secret = 'whsec_test';
+        $payload = '{"event":"invoice.paid"}';
+        $sig = 'sha256=' . hash_hmac('sha256', $payload, $secret);
+
+        self::assertTrue(BrivioClient::verifyWebhookSignature($payload, $sig, $secret));
+        self::assertFalse(BrivioClient::verifyWebhookSignature($payload . 'x', $sig, $secret));
+        self::assertFalse(BrivioClient::verifyWebhookSignature($payload, $sig, 'wrong'));
+        // Stale timestamp rejected
+        self::assertFalse(BrivioClient::verifyWebhookSignature($payload, $sig, $secret, (string) (time() - 400)));
+        // Fresh timestamp accepted
+        self::assertTrue(BrivioClient::verifyWebhookSignature($payload, $sig, $secret, (string) time()));
+    }
 }
