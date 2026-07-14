@@ -396,6 +396,107 @@ final class BrivioClient
         return ['data' => $data, 'meta' => $res['meta'] ?? []];
     }
 
+    // ── Banking ───────────────────────────────────────────────────────
+    /**
+     * Bank transactions synced from connected banks (read-only).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listBankingTransactions(array $params = []): array
+    {
+        $res = $this->http->get('/banking/transactions', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Bank connections for the organization (read-only).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listBankingConnections(array $params = []): array
+    {
+        $res = $this->http->get('/banking/connections', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    // ── Fixed assets ──────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listFixedAssets(array $params = []): array
+    {
+        $res = $this->http->get('/fixed-assets', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createFixedAsset(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/fixed-assets', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Documents ─────────────────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listDocuments(array $params = []): array
+    {
+        $res = $this->http->get('/documents', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function getDocument(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/documents/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createDocument(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/documents', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateDocument(string $id, array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/documents/' . rawurlencode($id), $input)['data'];
+        return $data;
+    }
+
+    public function deleteDocument(string $id): void
+    {
+        $this->http->delete('/documents/' . rawurlencode($id));
+    }
+
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
      * Optionally pass the X-Brivio-Timestamp header value to enforce a replay
