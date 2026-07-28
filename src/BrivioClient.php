@@ -36,6 +36,34 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Companies (public registry / Prospectare) ─────────────────────
+    /**
+     * Advanced registry search: filter ~2M Romanian companies by CAEN,
+     * county, size, financials and multi-year trends. AND between filter
+     * groups, OR within a group. Scope: companies:read.
+     *
+     * @param array{groups: list<array<string,mixed>>, sort?: string, page?: int, pageSize?: int, stats?: bool} $request
+     * @return array{results: list<array<string,mixed>>, pagination: array<string,mixed>, stats?: array<string,mixed>}
+     */
+    public function searchCompanies(array $request): array
+    {
+        /** @var array{results: list<array<string,mixed>>, pagination: array<string,mixed>, stats?: array<string,mixed>} $data */
+        $data = $this->http->post('/companies/search', $request)['data'];
+        return $data;
+    }
+
+    /**
+     * Peer companies for a seed CUI (same CAEN / county / size band).
+     *
+     * @return array{results: list<array<string,mixed>>}
+     */
+    public function similarCompanies(string $cui, int $limit = 10): array
+    {
+        /** @var array{results: list<array<string,mixed>>} $data */
+        $data = $this->http->get('/companies/' . rawurlencode($cui) . '/similar', ['limit' => $limit])['data'];
+        return $data;
+    }
+
     // ── Contacts ──────────────────────────────────────────────────────
     /**
      * @param array<string, scalar|null> $params
@@ -495,6 +523,210 @@ final class BrivioClient
     public function deleteDocument(string $id): void
     {
         $this->http->delete('/documents/' . rawurlencode($id));
+    }
+
+    // ── Web & Domains: DNS ────────────────────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listDnsZones(array $params = []): array
+    {
+        $res = $this->http->get('/dns/zones', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function getDnsZone(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/dns/zones/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function createDnsZone(string $name, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/dns/zones', ['name' => $name], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    public function deleteDnsZone(string $id): void
+    {
+        $this->http->delete('/dns/zones/' . rawurlencode($id));
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listDnsRecords(string $zoneId): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/dns/zones/' . rawurlencode($zoneId) . '/records')['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input {name?, type, content, ttl?, priority?}
+     * @return array<string,mixed>
+     */
+    public function createDnsRecord(string $zoneId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/dns/zones/' . rawurlencode($zoneId) . '/records', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateDnsRecord(string $zoneId, string $recordId, array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->put(
+            '/dns/zones/' . rawurlencode($zoneId) . '/records/' . rawurlencode($recordId),
+            $input,
+        )['data'];
+        return $data;
+    }
+
+    public function deleteDnsRecord(string $zoneId, string $recordId): void
+    {
+        $this->http->delete('/dns/zones/' . rawurlencode($zoneId) . '/records/' . rawurlencode($recordId));
+    }
+
+    /** @return array<string,mixed> */
+    public function importDnsZone(string $zoneId, string $zoneFile, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/dns/zones/' . rawurlencode($zoneId) . '/import',
+            ['zone_file' => $zoneFile],
+            $idempotencyKey,
+        )['data'];
+        return $data;
+    }
+
+    /** @return array{zone: string, zone_file: string} */
+    public function exportDnsZone(string $zoneId): array
+    {
+        /** @var array{zone: string, zone_file: string} $data */
+        $data = $this->http->get('/dns/zones/' . rawurlencode($zoneId) . '/export')['data'];
+        return $data;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listDnsTemplates(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/dns/templates')['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,string> $params
+     * @return array<string,mixed>
+     */
+    public function applyDnsTemplate(string $zoneId, string $templateId, array $params = [], ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/dns/zones/' . rawurlencode($zoneId) . '/template',
+            ['template_id' => $templateId, 'params' => (object) $params],
+            $idempotencyKey,
+        )['data'];
+        return $data;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listDnsZoneVersions(string $zoneId): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/dns/zones/' . rawurlencode($zoneId) . '/versions')['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function rollbackDnsZone(string $zoneId, int $version, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/dns/zones/' . rawurlencode($zoneId) . '/rollback',
+            ['version' => $version],
+            $idempotencyKey,
+        )['data'];
+        return $data;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listDnsConnections(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/dns/connections')['data'];
+        return $data;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listDnsConnectionZones(string $connectionId): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/dns/connections/' . rawurlencode($connectionId) . '/zones')['data'];
+        return $data;
+    }
+
+    // ── Web & Domains: registered domains ──────────────────────────
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listDomains(array $params = []): array
+    {
+        $res = $this->http->get('/domains', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function lockDomain(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/domains/' . rawurlencode($id) . '/lock', [])['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function unlockDomain(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/domains/' . rawurlencode($id) . '/unlock', [])['data'];
+        return $data;
+    }
+
+    /** @return array{domain: string, auth_code: string} */
+    public function getDomainAuthCode(string $id): array
+    {
+        /** @var array{domain: string, auth_code: string} $data */
+        $data = $this->http->get('/domains/' . rawurlencode($id) . '/auth-code')['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function renewDomain(string $id, int $period = 1, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/domains/' . rawurlencode($id) . '/renew', ['period' => $period], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function getDomainHealth(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/domains/' . rawurlencode($id) . '/health')['data'];
+        return $data;
     }
 
     /**

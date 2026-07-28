@@ -66,6 +66,15 @@ final class HttpClient
     }
 
     /**
+     * @param array<string, mixed> $body
+     * @return array{data: mixed, meta?: array<string,mixed>}
+     */
+    public function put(string $path, array $body, ?string $idempotencyKey = null): array
+    {
+        return $this->request('PUT', $path, json_encode($body, JSON_THROW_ON_ERROR), $idempotencyKey);
+    }
+
+    /**
      * @return array{data: mixed, meta?: array<string,mixed>}
      */
     public function delete(string $path): array
