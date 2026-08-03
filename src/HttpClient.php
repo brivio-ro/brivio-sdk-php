@@ -102,7 +102,7 @@ final class HttpClient
         /** @var array{data?: mixed, error?: array{code?:string,message?:string,details?:array<string,list<string>>|null}|null, meta?: array<string,mixed>} $json */
         $json = json_decode($res['body'], true, 512, JSON_THROW_ON_ERROR) ?? [];
 
-        if (isset($json['error']) && $json['error'] !== null) {
+        if (isset($json['error'])) {
             $err = $json['error'];
             throw new BrivioException(
                 $err['message'] ?? 'Request failed',
