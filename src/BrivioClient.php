@@ -729,6 +729,108 @@ final class BrivioClient
         return $data;
     }
 
+        // ── API keys ──────────────────────────────────────────────────────
+        /**
+         * List API keys for the organization (mirrors TS ApiKeysClient::list).
+         *
+         * @return list<array<string,mixed>>
+         */
+        public function getApiKeys(): array
+        {
+            /** @var list<array<string,mixed>> $data */
+            $data = $this->http->get('/api-keys')['data'] ?? [];
+            return $data;
+        }
+
+        /**
+         * Create an API key (mirrors TS ApiKeysClient::create). The full secret
+         * `key` is present only in this response — store it immediately.
+         *
+         * @param array{name: string, scopes: list<string>, expires_at?: string} $input
+         * @return array<string,mixed>
+         */
+        public function createApiKey(array $input, ?string $idempotencyKey = null): array
+        {
+            /** @var array<string,mixed> $data */
+            $data = $this->http->post('/api-keys', $input, $idempotencyKey)['data'];
+            return $data;
+        }
+
+        /**
+         * Revoke an API key (mirrors TS ApiKeysClient::revoke).
+         *
+         * @return array{id: string, revoked: bool}
+         */
+        public function revokeApiKey(string $id): array
+        {
+            /** @var array{id: string, revoked: bool} $data */
+            $data = $this->http->delete('/api-keys/' . rawurlencode($id))['data'];
+            return $data;
+        }
+
+        // ── Subscriptions (merchant recurring billing) ────────────────────
+        /**
+         * List subscriptions for an external customer id (mirrors TS
+         * SubscriptionsClient::listForCustomer).
+         *
+         * NOTE: unlike the TS SDK, this client has no automatic pagination /
+         * retry helper yet — callers iterate pages manually where applicable.
+         *
+         * @return array{subscriptions: list<array<string,mixed>>}
+         */
+        public function getSubscriptions(string $externalCustomerId): array
+        {
+            /** @var array{subscriptions: list<array<string,mixed>>} $data */
+            $data = $this->http->get('/subscriptions', ['external_customer_id' => $externalCustomerId])['data'];
+            return $data;
+        }
+
+        /**
+         * Get a subscription by id (mirrors TS SubscriptionsClient::get).
+         *
+         * @return array{subscription: array<string,mixed>}
+         */
+        public function getSubscription(string $id): array
+        {
+            /** @var array{subscription: array<string,mixed>} $data */
+            $data = $this->http->get('/subscriptions/' . rawurlencode($id))['data'];
+            return $data;
+        }
+
+        // ── Quotes ────────────────────────────────────────────────────────
+        /**
+         * Accept a quote/offer on behalf of the API caller.
+         *
+         * Maps to POST /quotes/{id}/accept; the public-token acceptance flow
+         * stays in the app UI — this is the API-key variant.
+         *
+         * @return array<string,mixed>
+         */
+        public function acceptOffer(string $quoteId, ?string $idempotencyKey = null): array
+        {
+            /** @var array<string,mixed> $data */
+            $data = $this->http->post('/quotes/' . rawurlencode($quoteId) . '/accept', [], $idempotencyKey)['data'];
+            return $data;
+        }
+
+        // ── Trust (EU digital signatures) ─────────────────────────────────
+        /**
+         * List trust documents/signatures (scope: trust:sign).
+         *
+         * NOTE: no pagination/retry helper here yet (gap vs the TS SDK's
+         * page-aware clients) — pass `page`/`perPage` in $params manually.
+         *
+         * @param array<string, scalar|null> $params
+         * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+         */
+        public function listTrustDocuments(array $params = []): array
+        {
+            $res = $this->http->get('/trust/signatures', $params);
+            /** @var list<array<string,mixed>> $data */
+            $data = $res['data'] ?? [];
+            return ['data' => $data, 'meta' => $res['meta'] ?? []];
+        }
+
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
      * Optionally pass the X-Brivio-Timestamp header value to enforce a replay
