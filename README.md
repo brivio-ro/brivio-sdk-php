@@ -11,6 +11,28 @@ with minimal code changes.
 composer require brivio/sdk
 ```
 
+## Why this directory has no `package.json`
+
+Deliberate (Grand Sweep P3-06, finding F15). This is a **Composer** package,
+not a Node one. `pnpm-workspace.yaml` globs `packages/*`, but pnpm ignores a
+directory without a `package.json`, so it costs nothing and adding a stub
+`package.json` would put a fake Node package into `pnpm -r` and the Turbo task
+graph for no build, test or lint task that could run there.
+
+R-F flagged it as "invisible to pnpm/Turbo/CI". Invisible to pnpm and Turbo —
+yes, correctly. **Invisible to CI — no.** It has first-class CI of its own:
+
+| Concern              | Where                                                                      |
+| -------------------- | -------------------------------------------------------------------------- |
+| PHPUnit + PHPStan    | `.github/workflows/php-sdk.yml` (paths-filtered on `packages/sdk-php/**`)  |
+| Release to Packagist | `.github/workflows/release-php-sdk.yml`                                    |
+| Pre-commit gate      | `scripts/pre-commit.mjs` runs PHPStan/PHPUnit when `.php` files are staged |
+| Affected detection   | `scripts/lib/affected.mjs` (`phpChanged`)                                  |
+| OpenAPI drift        | `scripts/openapi-sync.mjs`                                                 |
+
+Decision: **leave as-is.** Revisit only if it ever needs to participate in a
+Turbo pipeline.
+
 Requires PHP 8.2+, `ext-json`, `ext-curl`.
 
 ## Quick start
