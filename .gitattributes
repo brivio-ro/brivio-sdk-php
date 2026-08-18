@@ -1,0 +1,11 @@
+# Keep development-only files out of the Composer dist archive.
+#
+# Packagist serves a zip built from the tagged tree, so without export-ignore
+# every consumer downloads our test suite and static-analysis config as part of
+# their production dependencies. Only src/, composer.json, README and LICENSE
+# have any business being installed.
+/tests            export-ignore
+/phpunit.xml      export-ignore
+/phpstan.neon     export-ignore
+/.gitattributes   export-ignore
+/.phpunit.cache   export-ignore

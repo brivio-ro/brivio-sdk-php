@@ -53,7 +53,7 @@ final class HttpClient
      */
     public function post(string $path, array $body, ?string $idempotencyKey = null): array
     {
-        return $this->request('POST', $path, json_encode($body, JSON_THROW_ON_ERROR), $idempotencyKey);
+        return $this->request('POST', $path, self::encode($body), $idempotencyKey);
     }
 
     /**
@@ -62,7 +62,7 @@ final class HttpClient
      */
     public function patch(string $path, array $body, ?string $idempotencyKey = null): array
     {
-        return $this->request('PATCH', $path, json_encode($body, JSON_THROW_ON_ERROR), $idempotencyKey);
+        return $this->request('PATCH', $path, self::encode($body), $idempotencyKey);
     }
 
     /**
@@ -71,7 +71,23 @@ final class HttpClient
      */
     public function put(string $path, array $body, ?string $idempotencyKey = null): array
     {
-        return $this->request('PUT', $path, json_encode($body, JSON_THROW_ON_ERROR), $idempotencyKey);
+        return $this->request('PUT', $path, self::encode($body), $idempotencyKey);
+    }
+
+    /**
+     * Encode a request body, keeping whole floats as floats.
+     *
+     * Without JSON_PRESERVE_ZERO_FRACTION, PHP serialises (float) 2 as `2`,
+     * so a quantity or VAT rate the caller deliberately typed as a float
+     * arrives at the API as an integer. The legacy shims cast every numeric
+     * line field to float precisely to normalise this, and the cast was being
+     * undone on the way out.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function encode(array $body): string
+    {
+        return json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
     }
 
     /**
