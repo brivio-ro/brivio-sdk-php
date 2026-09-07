@@ -133,6 +133,32 @@ final class BrivioClientTest extends TestCase
         self::assertStringContainsString('status=ACTIVE', (string) $t->url);
     }
 
+    /**
+     * CN-0108. The construction vertical reached the gateway, OpenAPI, the TS
+     * SDK, the CLI and MCP — and not this SDK, while both coverage gates
+     * stayed green because neither looked at PHP.
+     */
+    public function testListWorkCertificatesFiltersByProject(): void
+    {
+        $t = new FakeTransport(['data' => [], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->listWorkCertificates(['project_id' => 'p1']);
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/construction/work-certificates', (string) $t->url);
+        self::assertStringContainsString('project_id=p1', (string) $t->url);
+    }
+
+    public function testListProjectScheduleEncodesPathId(): void
+    {
+        $t = new FakeTransport(['data' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $client->listProjectSchedule('p 1/x');
+        self::assertSame('GET', $t->method);
+        // The id is interpolated into the PATH, so an unencoded slash would
+        // silently address a different endpoint.
+        self::assertStringContainsString('/construction/projects/p%201%2Fx/schedule', (string) $t->url);
+    }
+
     public function testCreateExpensePostsBody(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'e1'], 'error' => null], 201);

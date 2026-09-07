@@ -228,6 +228,39 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Construction ──────────────────────────────────────────────────
+    /**
+     * Situații de lucrări — what has been certified as built, and for how
+     * much (scope: projects:read).
+     *
+     * `project_id` filters through the deviz rather than a column on the
+     * certificate: a situație reaches its project only via the quote it was
+     * cut against, so the server does the join.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listWorkCertificates(array $params = []): array
+    {
+        $res = $this->http->get('/construction/work-certificates', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * The graficul de eșalonare of a project, in order (scope: projects:read).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listProjectSchedule(string $projectId): array
+    {
+        $res = $this->http->get('/construction/projects/' . rawurlencode($projectId) . '/schedule');
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return $data;
+    }
+
     // ── Expenses ──────────────────────────────────────────────────────
     /**
      * @param array<string, scalar|null> $params
