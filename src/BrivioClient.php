@@ -864,6 +864,138 @@ final class BrivioClient
             return ['data' => $data, 'meta' => $res['meta'] ?? []];
         }
 
+        // ── Business Network (BN-0082, ADR-0157) ──────────────────────────
+        // Find verified providers, ask up to three for a quote, accept one.
+        // Money never transits Brivio (ADR-0147): accepting a quote creates a
+        // relationship, not a charge.
+
+        /**
+         * Ranked provider search; policy-gated per category (scope: network:read).
+         *
+         * @param array<string, scalar|null> $params category, county, city, q, limit (max 50)
+         * @return array{ranking_config_version: int, partners: list<array<string,mixed>>}
+         */
+        public function networkSearchPartners(array $params = []): array
+        {
+            /** @var array{ranking_config_version: int, partners: list<array<string,mixed>>} $data */
+            $data = $this->http->get('/network/partners', $params)['data'];
+            return $data;
+        }
+
+        /**
+         * Requests you raised (role=requester, default) or were asked to quote
+         * (role=provider, requester redacted to a label) (scope: network:read).
+         *
+         * @param array<string, scalar|null> $params role, page, perPage
+         * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+         */
+        public function networkListRequests(array $params = []): array
+        {
+            $res = $this->http->get('/network/requests', $params);
+            /** @var list<array<string,mixed>> $data */
+            $data = $res['data'] ?? [];
+            return ['data' => $data, 'meta' => $res['meta'] ?? []];
+        }
+
+        /**
+         * Create a service request to at most 3 verified listings chosen from
+         * networkSearchPartners() (scope: network:write).
+         *
+         * @param array<string, mixed> $body category, title, brief, listing_ids (1-3), county?, city?, accepts_remote?, budget_bani?, details?
+         * @return array{id: string, targets: int}
+         */
+        public function networkCreateRequest(array $body, ?string $idempotencyKey = null): array
+        {
+            /** @var array{id: string, targets: int} $data */
+            $data = $this->http->post('/network/requests', $body, $idempotencyKey)['data'];
+            return $data;
+        }
+
+        /**
+         * One request: full with every quote for the requester, redacted with
+         * only your own quote for a targeted provider (scope: network:read).
+         *
+         * @return array<string, mixed>
+         */
+        public function networkGetRequest(string $requestId): array
+        {
+            /** @var array<string, mixed> $data */
+            $data = $this->http->get('/network/requests/' . rawurlencode($requestId))['data'];
+            return $data;
+        }
+
+        /**
+         * Submit (or supersede) your quote on a request you were asked to quote
+         * (scope: network:write).
+         *
+         * @param array<string, mixed> $body amount_bani, currency?, pricing?, includes?, excludes?, delivery_days?, valid_days?, non_assurance_attested?
+         * @return array<string, mixed>
+         */
+        public function networkSubmitQuote(string $requestId, array $body, ?string $idempotencyKey = null): array
+        {
+            /** @var array<string, mixed> $data */
+            $data = $this->http->post(
+                '/network/requests/' . rawurlencode($requestId) . '/quotes',
+                $body,
+                $idempotencyKey,
+            )['data'];
+            return $data;
+        }
+
+        /**
+         * Accept a quote on your request: closes the request, declines the
+         * others, creates the relationship. No payment step (scope: network:write).
+         *
+         * @return array{relationship_id: string, request_id: string, quote_id: string, payment_required: bool}
+         */
+        public function networkAcceptQuote(string $quoteId, ?string $idempotencyKey = null): array
+        {
+            /** @var array{relationship_id: string, request_id: string, quote_id: string, payment_required: bool} $data */
+            $data = $this->http->post('/network/quotes/' . rawurlencode($quoteId) . '/accept', [], $idempotencyKey)['data'];
+            return $data;
+        }
+
+        /**
+         * Decline one quote on your request (scope: network:write).
+         *
+         * @return array{id: string, status: string}
+         */
+        public function networkDeclineQuote(string $quoteId, ?string $idempotencyKey = null): array
+        {
+            /** @var array{id: string, status: string} $data */
+            $data = $this->http->post('/network/quotes/' . rawurlencode($quoteId) . '/decline', [], $idempotencyKey)['data'];
+            return $data;
+        }
+
+        /**
+         * Withdraw an open request you raised; live quotes are declined
+         * (scope: network:write).
+         *
+         * @return array{id: string, status: string}
+         */
+        public function networkWithdrawRequest(string $requestId, ?string $idempotencyKey = null): array
+        {
+            /** @var array{id: string, status: string} $data */
+            $data = $this->http->post('/network/requests/' . rawurlencode($requestId) . '/withdraw', [], $idempotencyKey)['data'];
+            return $data;
+        }
+
+        /**
+         * Relationships where you are the provider or the client, with origin
+         * and service kind; never the counterpart's contact details
+         * (scope: network:read).
+         *
+         * @param array<string, scalar|null> $params page, perPage
+         * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+         */
+        public function networkListRelationships(array $params = []): array
+        {
+            $res = $this->http->get('/network/relationships', $params);
+            /** @var list<array<string,mixed>> $data */
+            $data = $res['data'] ?? [];
+            return ['data' => $data, 'meta' => $res['meta'] ?? []];
+        }
+
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
      * Optionally pass the X-Brivio-Timestamp header value to enforce a replay
