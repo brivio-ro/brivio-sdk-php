@@ -486,6 +486,176 @@ final class BrivioClient
         return ['data' => $data, 'meta' => $res['meta'] ?? []];
     }
 
+    // BK-0044 — read-complete + import / match / rules.
+
+    /**
+     * One bank transaction with its invoice allocations.
+     *
+     * @return array<string,mixed>
+     */
+    public function getBankingTransaction(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/banking/transactions/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Top-5 open-invoice candidates for a bank line.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function suggestBankingMatches(string $id): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/banking/transactions/' . rawurlencode($id) . '/suggestions')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Allocate a bank line to an invoice and post it to the ledger.
+     *
+     * @param array{invoice_id: string, amount?: float} $input
+     * @return array<string,mixed>
+     */
+    public function matchBankingTransaction(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/banking/transactions/' . rawurlencode($id) . '/match', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Unmatch a bank line. A line posted to the ledger needs `storno => true`.
+     *
+     * @param array{storno?: bool} $input
+     * @return array<string,mixed>
+     */
+    public function unmatchBankingTransaction(string $id, array $input = []): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/banking/transactions/' . rawurlencode($id) . '/unmatch', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * Imported bank statements (IBAN masked to last4).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listBankingStatements(array $params = []): array
+    {
+        $res = $this->http->get('/banking/statements', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * One statement with its (paginated) transactions.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: array<string,mixed>, meta: array<string,mixed>}
+     */
+    public function getBankingStatement(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/banking/statements/' . rawurlencode($id), $params);
+        /** @var array<string,mixed> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Import a statement file (csv, mt940, camt053, ...). Re-importing the
+     * same file is a safe no-op.
+     *
+     * @param array{format: string, content: string, sourceFilename?: string} $input
+     * @return array<string,mixed>
+     */
+    public function importBankingStatement(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/banking/statements/import', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listBankingRules(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/banking/rules')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function getBankingRule(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/banking/rules/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createBankingRule(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/banking/rules', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateBankingRule(string $id, array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/banking/rules/' . rawurlencode($id), $input)['data'];
+        return $data;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function deleteBankingRule(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/banking/rules/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Payment batches (read-only; IBANs masked).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listBankingPaymentBatches(array $params = []): array
+    {
+        $res = $this->http->get('/banking/payment-batches', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function getBankingPaymentBatch(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/banking/payment-batches/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
     // ── Fixed assets ──────────────────────────────────────────────────
     /**
      * @param array<string, scalar|null> $params
