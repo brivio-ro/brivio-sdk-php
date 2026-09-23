@@ -113,6 +113,110 @@ final class BrivioClientTest extends TestCase
         self::assertSame('pi_1', $r['payment_intent_id']);
     }
 
+    // PAY-0047/0048 — the payments spine.
+    public function testListPaymentsSendsSpineFilters(): void
+    {
+        $t = new FakeTransport(['data' => [['id' => 'p1', 'amount_minor' => 35000]], 'error' => null, 'meta' => ['total' => 1]]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->listPayments(['status' => 'paid', 'source_kind' => 'invoice', 'q' => 'pi_123']);
+
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/payments?', (string) $t->url);
+        self::assertStringNotContainsString('/payments/charge', (string) $t->url);
+        self::assertStringContainsString('status=paid', (string) $t->url);
+        self::assertStringContainsString('source_kind=invoice', (string) $t->url);
+        self::assertStringContainsString('q=pi_123', (string) $t->url);
+        self::assertSame(35000, $r['data'][0]['amount_minor']);
+        self::assertSame(1, $r['meta']['total']);
+    }
+
+    public function testGetPaymentUsesPathId(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'p9', 'status' => 'paid'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $p = $client->getPayment('p9');
+
+        self::assertSame('https://api.example/v1/payments/p9', $t->url);
+        self::assertSame('p9', $p['id']);
+    }
+
+    public function testRefundPaymentPostsAmountAndIdempotencyKey(): void
+    {
+        $t = new FakeTransport(['data' => ['refunded_minor' => 1000, 'pending' => false, 'payment' => ['id' => 'p1', 'status' => 'partially_refunded']], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->refundPayment('p1', ['amount_minor' => 1000, 'reason' => 'goodwill'], 'idem-refund');
+
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/payments/p1/refund', $t->url);
+        self::assertSame('idem-refund', $t->headers['Idempotency-Key']);
+        self::assertSame(1000, $t->decodedBody()['amount_minor']);
+        self::assertSame('goodwill', $t->decodedBody()['reason']);
+        self::assertSame(1000, $r['refunded_minor']);
+        self::assertFalse($r['pending']);
+        self::assertSame('partially_refunded', $r['payment']['status']);
+    }
+
+    public function testRefundPaymentConflictThrows(): void
+    {
+        $t = new FakeTransport(
+            ['data' => null, 'error' => ['code' => 'CONFLICT', 'message' => 'not-paid', 'details' => null]],
+            409,
+        );
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $this->expectException(BrivioException::class);
+        $client->refundPayment('p1');
+    }
+
+    public function testCreatePaymentLinkPostsMajorUnitAmount(): void
+    {
+        $t = new FakeTransport(
+            ['data' => ['id' => 'l1', 'token' => 'tok', 'url' => 'https://pay.brivio.ro/pay/tok', 'qr_url' => null, 'expires_at' => '2026-10-23T00:00:00.000Z'], 'error' => null],
+            201,
+        );
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->createPaymentLink(['amount' => 350, 'currency' => 'RON', 'description' => 'Consultanță'], 'idem-link');
+
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/payment-links', $t->url);
+        self::assertSame('idem-link', $t->headers['Idempotency-Key']);
+        self::assertSame(350, $t->decodedBody()['amount']);
+        self::assertSame('https://pay.brivio.ro/pay/tok', $r['url']);
+    }
+
+    public function testPaymentLinkListGetCancelPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'l1', 'provider_cancelled' => false, 'link' => null], 'error' => null, 'meta' => []]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listPaymentLinks(['status' => 'pending']);
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/payment-links?', (string) $t->url);
+        self::assertStringContainsString('status=pending', (string) $t->url);
+
+        $client->getPaymentLink('l1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/payment-links/l1', $t->url);
+
+        $r = $client->cancelPaymentLink('l1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/payment-links/l1/cancel', $t->url);
+        self::assertFalse($r['provider_cancelled']);
+    }
+
+    public function testListPayoutsSendsDateRange(): void
+    {
+        $t = new FakeTransport(['data' => [['id' => 'po1', 'gross' => '5000.00', 'fee' => '150.00', 'net' => '4850.00']], 'error' => null, 'meta' => ['total' => 1]]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $r = $client->listPayouts(['provider' => 'stripe', 'from' => '2026-09-01', 'to' => '2026-09-30', 'include_items' => 'false']);
+
+        self::assertStringContainsString('/payouts?', (string) $t->url);
+        self::assertStringContainsString('provider=stripe', (string) $t->url);
+        self::assertStringContainsString('from=2026-09-01', (string) $t->url);
+        self::assertStringContainsString('include_items=false', (string) $t->url);
+        self::assertSame('4850.00', $r['data'][0]['net']);
+    }
+
     public function testListAndCreateProject(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'p1', 'name' => 'P1'], 'error' => null], 201);
