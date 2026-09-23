@@ -204,6 +204,103 @@ final class BrivioClient
         return $data;
     }
 
+    /**
+     * List payments on the spine (ADR-0201) — every attempt to collect money,
+     * with provider reference and refund state. Filters: status, source_kind,
+     * from, to, q (exact provider_ref or pay token), page, perPage.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listPayments(array $params = []): array
+    {
+        $res = $this->http->get('/payments', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function getPayment(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/payments/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Refund through the account that collected the money. Omit amount_minor
+     * for the full remaining amount; `pending` true = processor accepted but
+     * has not settled. Scope payments:refund.
+     * @param array{amount_minor?: int, reason?: string} $input
+     * @return array{refunded_minor: int, pending: bool, payment: array<string,mixed>}
+     */
+    public function refundPayment(string $id, array $input = [], ?string $idempotencyKey = null): array
+    {
+        /** @var array{refunded_minor: int, pending: bool, payment: array<string,mixed>} $data */
+        $data = $this->http->post('/payments/' . rawurlencode($id) . '/refund', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Payment links ─────────────────────────────────────────────────
+    /**
+     * Mint a shareable pay URL. `amount` is in MAJOR units (350.00). The
+     * provider is not contacted until the payer opens the link.
+     * @param array<string,mixed> $input amount, currency, description, customer_email?, customer_name?, expires_in_days?
+     * @return array{id: string, token: string, url: string, qr_url: ?string, expires_at: string}
+     */
+    public function createPaymentLink(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array{id: string, token: string, url: string, qr_url: ?string, expires_at: string} $data */
+        $data = $this->http->post('/payment-links', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listPaymentLinks(array $params = []): array
+    {
+        $res = $this->http->get('/payment-links', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /** @return array<string,mixed> */
+    public function getPaymentLink(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/payment-links/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Cancel an open link. Throws BrivioException (409 CONFLICT) when already paid.
+     * @return array{provider_cancelled: bool, link: ?array<string,mixed>}
+     */
+    public function cancelPaymentLink(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array{provider_cancelled: bool, link: ?array<string,mixed>} $data */
+        $data = $this->http->post('/payment-links/' . rawurlencode($id) . '/cancel', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Payouts ───────────────────────────────────────────────────────
+    /**
+     * Processor settlements with the charges each one covers. Filters:
+     * provider, status, from, to (arrival_date, YYYY-MM-DD), include_items.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listPayouts(array $params = []): array
+    {
+        $res = $this->http->get('/payouts', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
     // ── Projects ──────────────────────────────────────────────────────
     /**
      * @param array<string, scalar|null> $params
