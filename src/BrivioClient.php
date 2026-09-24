@@ -1464,26 +1464,8 @@ final class BrivioClient
         return $data;
     }
 
-    /**
-     * Update a quote (partial).
-     *
-     * @param array<string,mixed> $input
-     * @return array<string,mixed>
-     */
-    public function updateQuote(string $id, array $input, ?string $idempotencyKey = null): array
-    {
-        /** @var array<string,mixed> $data */
-        $data = $this->http->patch('/quotes/' . rawurlencode($id), $input, $idempotencyKey)['data'];
-        return $data;
-    }
-
-    /**
-     * Delete a quote.
-     */
-    public function deleteQuote(string $id): void
-    {
-        $this->http->delete('/quotes/' . rawurlencode($id));
-    }
+    // Quotes are read-only over the API (BC-0195): PATCH/DELETE /quotes/{id}
+    // were advertised in the spec but never served, so the methods are gone.
 
     /**
      * List time entries. Params: page, perPage, project_id, from, to, search.
@@ -1511,26 +1493,8 @@ final class BrivioClient
         return $data;
     }
 
-    /**
-     * Update a time entry (partial).
-     *
-     * @param array<string,mixed> $input
-     * @return array<string,mixed>
-     */
-    public function updateTimeEntry(string $id, array $input, ?string $idempotencyKey = null): array
-    {
-        /** @var array<string,mixed> $data */
-        $data = $this->http->patch('/time-entries/' . rawurlencode($id), $input, $idempotencyKey)['data'];
-        return $data;
-    }
-
-    /**
-     * Delete a time entry.
-     */
-    public function deleteTimeEntry(string $id): void
-    {
-        $this->http->delete('/time-entries/' . rawurlencode($id));
-    }
+    // Time entries are read-only over the API (BC-0195): PATCH/DELETE
+    // /time-entries/{id} were advertised in the spec but never served.
 
     // ── Affiliates (BC-0194) ──────────────────────────────────────────────
 
