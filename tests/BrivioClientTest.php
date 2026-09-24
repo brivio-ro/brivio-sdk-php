@@ -259,4 +259,41 @@ final class BrivioClientTest extends TestCase
         $client->listEmployees(['department' => 'Vanzari']);
         self::assertStringContainsString('/hr/employees', (string) $t->url);
     }
+
+    public function testParityMethodsBuildPathsAndVerbs(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'x'], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->acceptOffer('q 1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/network/quotes/q%201/accept', (string) $t->url);
+
+        $client->sendEmail(['to' => [['email' => 'a@b.ro']], 'subject' => 'Hi', 'category' => 'transactional', 'text' => 'x'], 'idem-1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/emails/send', (string) $t->url);
+        self::assertSame('transactional', $t->decodedBody()['category']);
+        self::assertSame('idem-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->verifyEmailDomain('d1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/email-domains/d1/verify', (string) $t->url);
+
+        $client->deleteEmailDomain('d1');
+        self::assertSame('DELETE', $t->method);
+
+        $client->listPaymentMethods('cust_9');
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/payment-methods', (string) $t->url);
+        self::assertStringContainsString('external_customer_id=cust_9', (string) $t->url);
+
+        $client->rotateApiKey('k1', ['grace_period_hours' => 1]);
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/api-keys/k1/rotate', (string) $t->url);
+        self::assertSame(1, $t->decodedBody()['grace_period_hours']);
+
+        $client->listSites();
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/sites', (string) $t->url);
+    }
 }

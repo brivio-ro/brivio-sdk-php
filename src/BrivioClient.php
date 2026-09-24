@@ -1004,15 +1004,15 @@ final class BrivioClient
         /**
          * Accept a quote/offer on behalf of the API caller.
          *
-         * Maps to POST /quotes/{id}/accept; the public-token acceptance flow
-         * stays in the app UI — this is the API-key variant.
+         * Maps to POST /network/quotes/{id}/accept (there is no bare /quotes/{id}/accept
+         * in the API — that path never existed; BC-0194). Alias of networkAcceptQuote().
          *
          * @return array<string,mixed>
          */
         public function acceptOffer(string $quoteId, ?string $idempotencyKey = null): array
         {
             /** @var array<string,mixed> $data */
-            $data = $this->http->post('/quotes/' . rawurlencode($quoteId) . '/accept', [], $idempotencyKey)['data'];
+            $data = $this->http->post('/network/quotes/' . rawurlencode($quoteId) . '/accept', [], $idempotencyKey)['data'];
             return $data;
         }
 
@@ -1165,6 +1165,1124 @@ final class BrivioClient
             $data = $res['data'] ?? [];
             return ['data' => $data, 'meta' => $res['meta'] ?? []];
         }
+
+    // ── Contacts / articles / projects / contracts / expenses / locations — single-record CRUD (BC-0194) ───
+
+    /**
+     * Get a contact by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getContact(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/contacts/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a contact (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateContact(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/contacts/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a contact.
+     */
+    public function deleteContact(string $id): void
+    {
+        $this->http->delete('/contacts/' . rawurlencode($id));
+    }
+
+    /**
+     * Get an article by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getArticle(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/articles/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update an article (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateArticle(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/articles/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete an article.
+     */
+    public function deleteArticle(string $id): void
+    {
+        $this->http->delete('/articles/' . rawurlencode($id));
+    }
+
+    /**
+     * Get a project by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getProject(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/projects/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a project (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateProject(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/projects/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a project.
+     */
+    public function deleteProject(string $id): void
+    {
+        $this->http->delete('/projects/' . rawurlencode($id));
+    }
+
+    /**
+     * Get a contract by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getContract(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/contracts/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a contract (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateContract(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/contracts/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a contract.
+     */
+    public function deleteContract(string $id): void
+    {
+        $this->http->delete('/contracts/' . rawurlencode($id));
+    }
+
+    /**
+     * Get an expense by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getExpense(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/expenses/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update an expense (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateExpense(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/expenses/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete an expense.
+     */
+    public function deleteExpense(string $id): void
+    {
+        $this->http->delete('/expenses/' . rawurlencode($id));
+    }
+
+    /**
+     * Get a location by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getLocation(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/locations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    // ── Companies — lookup + GET search (BC-0194) ─────────────────────────
+
+    /**
+     * Look up one company by CUI (`cui`) or by name (`q`). Scope: contacts:read.
+     *
+     * @param array{cui?: string, q?: string} $params
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function lookupCompany(array $params = []): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/companies/lookup', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * GET variant of the registry search for simple filters passed as query parameters (the POST variant takes structured groups). Scope: companies:read.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function searchCompaniesGet(array $params = []): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/companies/search', $params)['data'] ?? [];
+        return $data;
+    }
+
+    // ── Invoices — line items, payments, send, e-Factura status (BC-0194) ───
+
+    /**
+     * Line items of an invoice.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listInvoiceItems(string $id): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/invoices/' . rawurlencode($id) . '/items')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Payments recorded against an invoice.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listInvoicePayments(string $id): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/invoices/' . rawurlencode($id) . '/payments')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Record a payment against an invoice.
+     *
+     * @param array{amount: string|float, payment_date: string, currency?: string, method?: string, reference?: string, notes?: string} $input
+     * @return array<string,mixed>
+     */
+    public function recordInvoicePayment(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/invoices/' . rawurlencode($id) . '/payments', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Mark an invoice as sent (DRAFT → SENT; idempotent).
+     *
+     * @return array<string,mixed>
+     */
+    public function sendInvoice(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/invoices/' . rawurlencode($id) . '/send', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * e-Factura (SPV) transmission status of an invoice.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getInvoiceEfacturaStatus(string $id): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/invoices/' . rawurlencode($id) . '/efactura-status')['data'] ?? [];
+        return $data;
+    }
+
+    // ── Quotes / time entries (BC-0194) ───────────────────────────────────
+
+    /**
+     * List quotes. Params: page, perPage, status, search.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listQuotes(array $params = []): array
+    {
+        $res = $this->http->get('/quotes', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get a quote by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getQuote(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/quotes/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a quote (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateQuote(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/quotes/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a quote.
+     */
+    public function deleteQuote(string $id): void
+    {
+        $this->http->delete('/quotes/' . rawurlencode($id));
+    }
+
+    /**
+     * List time entries. Params: page, perPage, project_id, from, to, search.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listTimeEntries(array $params = []): array
+    {
+        $res = $this->http->get('/time-entries', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get a time entry by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getTimeEntry(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/time-entries/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a time entry (partial).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateTimeEntry(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/time-entries/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a time entry.
+     */
+    public function deleteTimeEntry(string $id): void
+    {
+        $this->http->delete('/time-entries/' . rawurlencode($id));
+    }
+
+    // ── Affiliates (BC-0194) ──────────────────────────────────────────────
+
+    /**
+     * List affiliates of the programme. Params: page, perPage, status.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listAffiliates(array $params = []): array
+    {
+        $res = $this->http->get('/affiliates', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Enrol an affiliate.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function enrollAffiliate(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/affiliates', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Get an affiliate by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getAffiliate(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/affiliates/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Referrals attributed to an affiliate.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listAffiliateReferrals(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/affiliates/' . rawurlencode($id) . '/referrals', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Commission entries of an affiliate.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listAffiliateCommissions(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/affiliates/' . rawurlencode($id) . '/commissions', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Create a referral code for an affiliate.
+     *
+     * @param array{code: string, kind?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createAffiliateCode(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/affiliates/' . rawurlencode($id) . '/codes', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Record a referral click from an external storefront (scope: affiliates:write).
+     *
+     * @param array{code: string, ip?: string, user_agent?: string, referer?: string, landing_path?: string, utm?: array<string,string>} $input
+     * @return array<string,mixed>
+     */
+    public function recordAffiliateClick(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/affiliate-events/click', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Comms + Connect outreach (BC-0194) ────────────────────────────────
+
+    /**
+     * List Brivio Comms conversations. Params: page, perPage, status.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listConversations(array $params = []): array
+    {
+        $res = $this->http->get('/comms/conversations', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get a conversation by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getConversation(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/comms/conversations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Messages of a conversation.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listConversationMessages(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/comms/conversations/' . rawurlencode($id) . '/messages', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Send a message in a conversation.
+     *
+     * @param array{content: string, ai_generated?: bool} $input
+     * @return array<string,mixed>
+     */
+    public function sendConversationMessage(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/comms/conversations/' . rawurlencode($id) . '/messages', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * List Connect outreach sequences. Params: page, perPage.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listOutreach(array $params = []): array
+    {
+        $res = $this->http->get('/connect/outreach', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get an outreach sequence by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getOutreach(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/connect/outreach/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    // ── Webhooks — events + redeliver; API keys — rotate (BC-0194) ────────
+
+    /**
+     * Event types a webhook can subscribe to.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listWebhookEvents(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/webhooks/events')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Redeliver a failed/dead delivery now; pass ['force' => true] for an already-succeeded one.
+     *
+     * @param array{force?: bool} $input
+     * @return array<string,mixed>
+     */
+    public function redeliverWebhookDelivery(string $id, string $deliveryId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/webhooks/' . rawurlencode($id) . '/deliveries/' . rawurlencode($deliveryId) . '/redeliver', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Issue a replacement key with the same name and scopes; the old key keeps working for the grace period.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function rotateApiKey(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/api-keys/' . rawurlencode($id) . '/rotate', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Reference data — series, VAT rates, stock by location, banking coverage, cabinet SPV (BC-0194) ───
+
+    /**
+     * Document numbering series. Params: page, perPage, document_type, active.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSeries(array $params = []): array
+    {
+        $res = $this->http->get('/series', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Romanian VAT rates valid on a date (default today, Bucharest time).
+     *
+     * @param array{date?: string} $params
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getVatRates(array $params = []): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/taxes/vat-rates', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Per-location (gestiune) stock balances. Params: page, perPage, article_id, location_id.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listStockByLocation(array $params = []): array
+    {
+        $res = $this->http->get('/inventory/stock-by-location', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Reconciliation coverage per own bank account (scope: banking:read).
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getBankingCoverage(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/banking/coverage')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * One row per active managed client: last SPV sync, unread, rejected, SLA at risk (scope: efactura:read).
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getCabinetSpvStatus(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/cabinet/spv-status')['data'] ?? [];
+        return $data;
+    }
+
+    // ── Storefront verticals — orders, bookings, reservations, catalog, customers (BC-0194) ───
+
+    /**
+     * Storefront orders. Params: page, perPage, status.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listOrders(array $params = []): array
+    {
+        $res = $this->http->get('/orders', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get an order with its line items.
+     *
+     * @return array<string,mixed>
+     */
+    public function getOrder(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/orders/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Transition an order: pending|paid|fulfilled|cancelled|refunded.
+     *
+     * @param array{status: string} $input
+     * @return array<string,mixed>
+     */
+    public function setOrderStatus(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/orders/' . rawurlencode($id) . '/status', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Service appointments. Params: page, perPage, status.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listBookings(array $params = []): array
+    {
+        $res = $this->http->get('/bookings', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get an appointment.
+     *
+     * @return array<string,mixed>
+     */
+    public function getBooking(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/bookings/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Book an appointment.
+     *
+     * @param array{service_id: string, resource_id: string, customer_name: string, starts_at: string, customer_email?: string, customer_phone?: string, notes?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createBooking(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/bookings', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Hotel reservations. Params: page, perPage, status.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listReservations(array $params = []): array
+    {
+        $res = $this->http->get('/reservations', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Get a reservation.
+     *
+     * @return array<string,mixed>
+     */
+    public function getReservation(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/reservations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Sellable product catalog with synced prices (scope: articles:read).
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getCatalog(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/catalog')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Consolidated billing view of an external customer (scope: invoices:read).
+     *
+     * @return array<string,mixed>
+     */
+    public function getCustomer(string $externalId): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/customers/' . rawurlencode($externalId))['data'];
+        return $data;
+    }
+
+    // ── Marketing, payment methods, subscriptions — merchant platform (BC-0194) ───
+
+    /**
+     * Marketing audiences.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listAudiences(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/marketing/audiences')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Create an audience.
+     *
+     * @param array{name: string, description?: string, contact_ids?: list<string>} $input
+     * @return array<string,mixed>
+     */
+    public function createAudience(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/marketing/audiences', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Marketing campaigns.
+     *
+     * @param array{channel?: string, status?: string} $params
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listCampaigns(array $params = []): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/marketing/campaigns', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Create a campaign (draft).
+     *
+     * @param array{name: string, channel: string, audience_id: string, template_id?: string, subject?: string, body?: string, from_address?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createCampaign(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/marketing/campaigns', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Saved payment methods of an external customer.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listPaymentMethods(string $externalCustomerId): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/payment-methods', ['external_customer_id' => $externalCustomerId])['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Create a SetupIntent so the customer can save a card.
+     *
+     * @param array{external_customer_id: string, action: 'setup_intent', customer_email?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createSetupIntent(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/payment-methods', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Set a saved method as default or detach it.
+     *
+     * @param array{external_customer_id: string, payment_method_id: string, action: 'set_default'|'detach'} $input
+     * @return array<string,mixed>
+     */
+    public function updatePaymentMethod(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/payment-methods', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Start a merchant subscription for an external customer.
+     *
+     * @param array{article_price_id: string, external_customer_id: string, customer: array{email: string, name?: string}, contact_id?: string, metadata?: array<string,string>} $input
+     * @return array<string,mixed>
+     */
+    public function createSubscription(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/subscriptions', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * cancel | resume | change_price (with article_price_id).
+     *
+     * @param array{action: 'cancel'|'resume'|'change_price', article_price_id?: string} $input
+     * @return array<string,mixed>
+     */
+    public function updateSubscription(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/subscriptions/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Cancel immediately and delete the subscription record.
+     */
+    public function deleteSubscription(string $id): void
+    {
+        $this->http->delete('/subscriptions/' . rawurlencode($id));
+    }
+
+    // ── Trust — providers, signatures, validations, timestamps (BC-0194) ───
+
+    /**
+     * Available signature providers.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function listTrustProviders(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/trust/providers')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Request a signature on a base64-encoded document.
+     *
+     * @param array{document: string, file_name: string, signature_type?: string, level?: string, format?: string, provider?: string} $input
+     * @return array<string,mixed>
+     */
+    public function requestSignature(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/trust/signatures', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Batch-sign up to 100 documents.
+     *
+     * @param array{documents: list<array{document: string, file_name: string}>, signature_type?: string, level?: string, format?: string, provider?: string} $input
+     * @return array<string,mixed>
+     */
+    public function requestSignatureBatch(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/trust/signatures/batch', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Get a signature request by ID.
+     *
+     * @return array<string,mixed>
+     */
+    public function getSignature(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/trust/signatures/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Evidence bundles (audit trail, timestamps, certificates) of a signature.
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getSignatureEvidence(string $id): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/trust/signatures/' . rawurlencode($id) . '/evidence')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Validate signatures on a base64-encoded signed document.
+     *
+     * @param array{document: string, file_name: string, original_document?: string} $input
+     * @return array<string,mixed>
+     */
+    public function validateSignature(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/trust/validations', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Get a stored validation result.
+     *
+     * @return array<string,mixed>
+     */
+    public function getValidation(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/trust/validations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Apply a qualified timestamp to a signed document.
+     *
+     * @param array{document: string, file_name: string, provider?: string} $input
+     * @return array<string,mixed>
+     */
+    public function requestTimestamp(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/trust/timestamps', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Sites + Email-as-a-service (ADR-0210, BC-0194) ────────────────────────
+    /**
+     * Hosted sites of the organization.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSites(array $params = []): array
+    {
+        $res = $this->http->get('/sites', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Send an e-mail as the organization (transactional | notification | marketing).
+     * Attachments are base64 (2 MB total). Scope: emails:send.
+     *
+     * @param array{to: list<array{email: string, name?: string}>, subject: string, category: string, html?: string, text?: string, cc?: list<array{email: string, name?: string}>, bcc?: list<array{email: string, name?: string}>, from?: array{email: string, name?: string}, reply_to?: array{email: string, name?: string}, headers?: array<string,string>, tags?: list<string>, attachments?: list<array{filename: string, content_base64: string, content_type?: string}>} $input
+     * @return array<string,mixed>
+     */
+    public function sendEmail(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/emails/send', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Sent messages. Params: since (ISO datetime), status, page, perPage.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listEmails(array $params = []): array
+    {
+        $res = $this->http->get('/emails', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * One sent message with its delivery lifecycle.
+     *
+     * @return array<string,mixed>
+     */
+    public function getEmail(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/emails/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Sending domains of the organization (SPF/DKIM/DMARC state per domain).
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listEmailDomains(array $params = []): array
+    {
+        $res = $this->http->get('/email-domains', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Register a sending domain; the response carries the DNS records to publish.
+     *
+     * @param array{domain: string, from_local_part?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createEmailDomain(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/email-domains', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function getEmailDomain(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/email-domains/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Re-check the DNS records of a sending domain and update its verification state.
+     *
+     * @return array<string,mixed>
+     */
+    public function verifyEmailDomain(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/email-domains/' . rawurlencode($id) . '/verify', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Remove a sending domain.
+     */
+    public function deleteEmailDomain(string $id): void
+    {
+        $this->http->delete('/email-domains/' . rawurlencode($id));
+    }
 
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
