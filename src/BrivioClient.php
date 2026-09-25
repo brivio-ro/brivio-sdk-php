@@ -1097,6 +1097,19 @@ final class BrivioClient
             return $data;
         }
 
+        /**
+         * Report usage for a metered price (ADR-0212). `identifier` makes a retry a no-op.
+         *
+         * @param array{quantity:int, timestamp?:string, identifier?:string} $input
+         * @return array<string,mixed>
+         */
+        public function reportSubscriptionUsage(string $id, array $input): array
+        {
+            /** @var array<string,mixed> $data */
+            $data = $this->http->post('/subscriptions/' . rawurlencode($id) . '/usage', $input)['data'];
+            return $data;
+        }
+
         // ── Quotes ────────────────────────────────────────────────────────
         /**
          * Accept a quote/offer on behalf of the API caller.
@@ -1332,6 +1345,56 @@ final class BrivioClient
     }
 
     /**
+     * Upsert articles by external_id (ADR-0212). Input: { articles: list<array>, deactivate_missing_prices?: bool, sync_prices?: bool }.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function syncArticles(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/articles/sync', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * List an article's prices (ADR-0212).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listArticlePrices(string $id): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/articles/' . rawurlencode($id) . '/prices')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Add a price to an article; `unit_amount` in MINOR units, interval one_time|month|year|metered (ADR-0212).
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createArticlePrice(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/articles/' . rawurlencode($id) . '/prices', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Push an article's active prices to the org's Stripe account (ADR-0212).
+     *
+     * @return array<string,mixed>
+     */
+    public function syncArticlePrices(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/articles/' . rawurlencode($id) . '/prices/sync', [])['data'];
+        return $data;
+    }
+
+    /**
      * Get a project by ID.
      *
      * @return array<string,mixed>
@@ -1530,6 +1593,43 @@ final class BrivioClient
     {
         /** @var array<string,mixed>|list<array<string,mixed>> $data */
         $data = $this->http->get('/invoices/' . rawurlencode($id) . '/efactura-status')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Issue a credit note (storno) for an issued invoice (ADR-0212).
+     * Omit `lines` for a full storno; partial: list<array{invoice_item_id:string, quantity:float|int}>.
+     * 422 CREDIT_EXCEEDS_SOURCE when the credit notes would exceed the source total.
+     *
+     * @param array{reason?:string, lines?:list<array{invoice_item_id:string, quantity:float|int}>} $input
+     * @return array<string,mixed>
+     */
+    public function createInvoiceCreditNote(string $id, array $input = [], ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/invoices/' . rawurlencode($id) . '/credit-note', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * The invoice PDF as raw bytes (ADR-0212).
+     */
+    public function getInvoicePdf(string $id): string
+    {
+        /** @var string $bytes */
+        $bytes = $this->http->get('/invoices/' . rawurlencode($id) . '/pdf', [], true)['data'];
+        return $bytes;
+    }
+
+    /**
+     * Get (minting on first call) the invoice's public pay URL (ADR-0212).
+     *
+     * @return array<string,mixed>
+     */
+    public function getInvoicePaymentLink(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/invoices/' . rawurlencode($id) . '/payment-link', [], $idempotencyKey)['data'];
         return $data;
     }
 
