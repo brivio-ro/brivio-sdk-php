@@ -379,6 +379,16 @@ final class BrivioClientTest extends TestCase
         self::assertSame('transactional', $t->decodedBody()['category']);
         self::assertSame('idem-1', $t->headers['Idempotency-Key'] ?? null);
 
+        $client->sendEmailMessage(['to' => ['Ana <a@b.ro>'], 'subject' => 'Hi', 'text' => 'x', 'tags' => ['kind' => 'alert']], 'idem-2');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/email/send', (string) $t->url);
+        self::assertSame(['Ana <a@b.ro>'], $t->decodedBody()['to']);
+        self::assertSame('idem-2', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getEmailMessage('m 1');
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/email/messages/m%201', (string) $t->url);
+
         $client->verifyEmailDomain('d1');
         self::assertSame('POST', $t->method);
         self::assertStringContainsString('/email-domains/d1/verify', (string) $t->url);

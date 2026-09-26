@@ -2389,6 +2389,34 @@ final class BrivioClient
     }
 
     /**
+     * Platform mail lane (POST /email/send): RFC 5322 address strings and key=>value tags.
+     * 202 when recorded (status queued|sent|suppressed); 422 from_domain_not_verified;
+     * 502 send_failed. Scope: emails:send.
+     *
+     * @param array{to: list<string>, subject: string, from?: string, cc?: list<string>, bcc?: list<string>, reply_to?: string, html?: string, text?: string, headers?: array<string,string>, tags?: array<string,string>, category?: string} $input
+     * @return array<string,mixed>
+     */
+    public function sendEmailMessage(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/email/send', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A message sent through sendEmailMessage, with its delivery timeline.
+     * Scope: emails:send or emails:read.
+     *
+     * @return array<string,mixed>
+     */
+    public function getEmailMessage(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/email/messages/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
      * Sending domains of the organization (SPF/DKIM/DMARC state per domain).
      *
      * @param array<string, scalar|null> $params
