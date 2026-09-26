@@ -2777,6 +2777,365 @@ final class BrivioClient
         $this->http->delete('/prospecting/saved-searches/' . rawurlencode($id), $idempotencyKey);
     }
 
+    // ── Fleet (BC-0196 batch B) ──────────────────────────────────────
+    /**
+     * Fleet vehicles, by plate. Scope fleet:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listFleetVehicles(array $params = []): array
+    {
+        $res = $this->http->get('/fleet/vehicles', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Add a fleet vehicle (201); the registry vehicle is found (VIN, then
+     * plate) or created. Scope fleet:write.
+     * @param array<string,mixed> $input snake_case: plate (required), vin, make, model, year, category, fuel_type, ...
+     * @return array<string,mixed>
+     */
+    public function createFleetVehicle(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/fleet/vehicles', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A fleet vehicle. Scope fleet:read.
+     * @return array<string,mixed>
+     */
+    public function getFleetVehicle(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/fleet/vehicles/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a fleet vehicle; absent fields are left unchanged. Scope fleet:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateFleetVehicle(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/fleet/vehicles/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a fleet vehicle — its odometer readings and service logs are
+     * deleted with it. Scope fleet:write.
+     */
+    public function deleteFleetVehicle(string $id, ?string $idempotencyKey = null): void
+    {
+        $this->http->delete('/fleet/vehicles/' . rawurlencode($id), $idempotencyKey);
+    }
+
+    /**
+     * A vehicle's odometer readings, newest first. Scope fleet:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listFleetOdometerReadings(string $vehicleId, array $params = []): array
+    {
+        $res = $this->http->get('/fleet/vehicles/' . rawurlencode($vehicleId) . '/odometer-readings', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Record an odometer reading (201); the vehicle's current odometer moves
+     * to it. Scope fleet:write.
+     * @param array<string,mixed> $input { reading_km, reading_date (YYYY-MM-DD), notes? }
+     * @return array<string,mixed>
+     */
+    public function createFleetOdometerReading(string $vehicleId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/fleet/vehicles/' . rawurlencode($vehicleId) . '/odometer-readings', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A vehicle's service / repair / fuel log, newest first. Scope fleet:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listFleetServiceLogs(string $vehicleId, array $params = []): array
+    {
+        $res = $this->http->get('/fleet/vehicles/' . rawurlencode($vehicleId) . '/service-logs', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Add a service log entry (201). Scope fleet:write.
+     * @param array<string,mixed> $input { service_date (YYYY-MM-DD), type?, odometer_km?, cost_amount?, ... }
+     * @return array<string,mixed>
+     */
+    public function createFleetServiceLog(string $vehicleId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/fleet/vehicles/' . rawurlencode($vehicleId) . '/service-logs', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Drivers as id, name and status only, by name. Scope fleet_drivers:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listFleetDrivers(array $params = []): array
+    {
+        $res = $this->http->get('/fleet/drivers', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Delivery routes, newest first. Filters: status, date_from, date_to
+     * (YYYY-MM-DD, inclusive), page, per_page. Scope delivery:read.
+     * @param array<string,scalar> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listDeliveryRoutes(array $params = []): array
+    {
+        $res = $this->http->get('/delivery-routes', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Create a delivery route (DRAFT). Scope delivery:write.
+     * @param array<string,mixed> $input name?, route_date?, start_location_id?, start_address?, driver_id?, vehicle_id?, …
+     * @return array<string,mixed>
+     */
+    public function createDeliveryRoute(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/delivery-routes', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A delivery route. Scope delivery:read.
+     * @return array<string,mixed>
+     */
+    public function getDeliveryRoute(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/delivery-routes/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a delivery route (name, route_date, notes, capacity, driver_id,
+     * vehicle_id, status DRAFT|IN_PROGRESS|COMPLETED|CANCELLED). Scope delivery:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateDeliveryRoute(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/delivery-routes/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Cancel a delivery route (there is no deletion). Scope delivery:write.
+     * @return array<string,mixed>
+     */
+    public function cancelDeliveryRoute(string $id, ?string $idempotencyKey = null): array
+    {
+        return $this->updateDeliveryRoute($id, ['status' => 'CANCELLED'], $idempotencyKey);
+    }
+
+    /**
+     * Stops of a delivery route, in visit order. Scope delivery:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listDeliveryRouteStops(string $id): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/delivery-routes/' . rawurlencode($id) . '/stops')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Add a stop (route must be DRAFT or PLANNED; 409 otherwise). `recipient_phone`
+     * and `private_notes` are write-only. Scope delivery:write.
+     * @param array<string,mixed> $input address (street or city required), recipient_name?, invoice_id?, …
+     * @return array<string,mixed>
+     */
+    public function addDeliveryRouteStop(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/delivery-routes/' . rawurlencode($id) . '/stops', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Remove a stop from a delivery route. Scope delivery:write.
+     */
+    public function removeDeliveryRouteStop(string $id, string $stopId, ?string $idempotencyKey = null): void
+    {
+        $this->http->delete('/delivery-routes/' . rawurlencode($id) . '/stops/' . rawurlencode($stopId), $idempotencyKey);
+    }
+
+    /**
+     * Optimize the stop order (synchronous OSRM) and mark the route PLANNED.
+     * REQUIRED Idempotency-Key (generated when null); heavy rate tier. Scope delivery:write.
+     * @return array<string,mixed> route_id, status, stop_order, total_distance_km, warnings, …
+     */
+    public function optimizeDeliveryRoute(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/delivery-routes/' . rawurlencode($id) . '/optimize',
+            [],
+            $idempotencyKey ?? self::newIdempotencyKey(),
+        )['data'];
+        return $data;
+    }
+
+    /**
+     * E-mail the route sheet to the assigned driver and mark the route DISPATCHED.
+     * REQUIRED Idempotency-Key (generated when null — pass your own so a retry cannot
+     * mail twice). Scope delivery:dispatch (not implied by delivery:write).
+     * @return array<string,mixed> route_id, status, dispatched_at, stop_count, sent_to_driver
+     */
+    public function dispatchDeliveryRoute(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/delivery-routes/' . rawurlencode($id) . '/dispatch',
+            [],
+            $idempotencyKey ?? self::newIdempotencyKey(),
+        )['data'];
+        return $data;
+    }
+
+    // ── Court cases (BC-0196 batch B) ─────────────────────────────────────────
+    /**
+     * The organization's own court cases, newest first. Optional `status`
+     * (OPEN|SUSPENDED|WON|LOST|SETTLED|CLOSED), `page`, `perPage`. Scope legal:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listCourtCases(array $params = []): array
+    {
+        $res = $this->http->get('/legal/court-cases', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Record a court case (201). Linked contact/invoice/contract must belong to
+     * the organization (422 otherwise). Scope legal:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createCourtCase(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/legal/court-cases', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A court case. Scope legal:read.
+     * @return array<string,mixed>
+     */
+    public function getCourtCase(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/legal/court-cases/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Partial update; a terminal status sets closed_at when absent, OPEN clears it.
+     * Scope legal:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateCourtCase(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/legal/court-cases/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a court case with its hearings and notes. Scope legal:write.
+     */
+    public function deleteCourtCase(string $id, ?string $idempotencyKey = null): void
+    {
+        $this->http->delete('/legal/court-cases/' . rawurlencode($id), $idempotencyKey);
+    }
+
+    /**
+     * Hearings (termene) of a court case, by date. Scope legal:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listCourtCaseHearings(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/legal/court-cases/' . rawurlencode($id) . '/hearings', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Add a hearing (201): `{ hearing_date, time?, room?, panel?, solution?,
+     * solution_summary?, notes? }`. A future date becomes next_hearing_at.
+     * Scope legal:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createCourtCaseHearing(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/legal/court-cases/' . rawurlencode($id) . '/hearings', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Notes of a court case, newest first. Scope legal:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listCourtCaseNotes(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/legal/court-cases/' . rawurlencode($id) . '/notes', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Add a note (201): `{ content, is_internal? }`. Scope legal:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createCourtCaseNote(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/legal/court-cases/' . rawurlencode($id) . '/notes', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
     /** RFC 4122 v4 UUID for endpoints whose Idempotency-Key is mandatory. */
     private static function newIdempotencyKey(): string
     {
