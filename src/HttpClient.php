@@ -121,9 +121,9 @@ final class HttpClient
     /**
      * @return array{data: mixed, meta?: array<string,mixed>}
      */
-    public function delete(string $path): array
+    public function delete(string $path, ?string $idempotencyKey = null): array
     {
-        return $this->request('DELETE', $path, null);
+        return $this->request('DELETE', $path, null, $idempotencyKey);
     }
 
     /**
