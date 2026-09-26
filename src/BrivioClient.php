@@ -2445,6 +2445,319 @@ final class BrivioClient
         $this->http->delete('/email-domains/' . rawurlencode($id));
     }
 
+    // ── SAF-T D406 generations (BC-0196) ─────────────────────────────
+    /**
+     * SAF-T generations, newest first. Filters: page, perPage, fiscal_year_id,
+     * variant. Scope saft:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSaftGenerations(array $params = []): array
+    {
+        $res = $this->http->get('/saft/generations', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A SAF-T generation with its issue counts. Scope saft:read.
+     * @return array<string,mixed>
+     */
+    public function getSaftGeneration(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/saft/generations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Remediable findings of a SAF-T generation. Scope saft:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSaftGenerationFindings(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/saft/generations/' . rawurlencode($id) . '/findings', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Queue a SAF-T D406 generation on the worker (202). 409 when the
+     * readiness pre-flight blocks or one is already running; 503 when no
+     * worker is reachable. The API REQUIRES an Idempotency-Key — one is
+     * generated when omitted; pass your own to make retries safe.
+     * Scope saft:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createSaftGeneration(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/saft/generations', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * Signed download URL for a generated SAF-T file. 409 while not ready,
+     * 410 past retention. Heavy rate tier. Scope saft:export.
+     * @return array<string,mixed> url, expires_at, filename, …
+     */
+    public function getSaftGenerationDownload(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/saft/generations/' . rawurlencode($id) . '/download')['data'];
+        return $data;
+    }
+
+    // ── Exports (BC-0196) ────────────────────────────────────────────
+    /**
+     * Export jobs, newest first. Scope exports:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listExports(array $params = []): array
+    {
+        $res = $this->http->get('/exports', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * An export job. Scope exports:read.
+     * @return array<string,mixed>
+     */
+    public function getExport(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/exports/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Start a csv/xlsx export (202, runs in the background; poll getExport or
+     * subscribe to export.completed). Needs the exported entity's read scope
+     * too. The API REQUIRES an Idempotency-Key — generated when omitted.
+     * Scope exports:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createExport(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/exports', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * Download a finished export. Stored files answer JSON and this returns
+     * `['url' => …, 'expires_at' => …, 'filename' => …, 'sha256' => …]` — fetch
+     * the signed URL WITHOUT the bearer. Legacy rows (and deployments without
+     * object storage) answer the raw file; this then returns
+     * `['bytes' => <string>]`. 409 while running or failed, 410 once expired
+     * (both throw BrivioException). Heavy rate tier. Scope exports:read.
+     * @return array<string,mixed>
+     */
+    public function downloadExport(string $id): array
+    {
+        /** @var string $body */
+        $body = $this->http->get('/exports/' . rawurlencode($id) . '/download', [], true)['data'];
+        $json = json_decode($body, true);
+        if (is_array($json) && isset($json['data']) && is_array($json['data']) && isset($json['data']['url'])) {
+            /** @var array<string,mixed> $data */
+            $data = $json['data'];
+            return $data;
+        }
+        return ['bytes' => $body];
+    }
+
+    // ── Imports (BC-0196) ────────────────────────────────────────────
+    /**
+     * Import jobs, newest first. Scope imports:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listImports(array $params = []): array
+    {
+        $res = $this->http->get('/imports', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * An import job. Scope imports:read.
+     * @return array<string,mixed>
+     */
+    public function getImport(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/imports/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Row-level errors of an import job, paginated. Scope imports:read.
+     * @param array<string, scalar|null> $params page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listImportErrors(string $id, array $params = []): array
+    {
+        $res = $this->http->get('/imports/' . rawurlencode($id) . '/errors', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Stage rows for import (202, status staged or failed): computes the
+     * dedupe preview; nothing is written until commitImport. The API REQUIRES
+     * an Idempotency-Key — generated when omitted. Scope imports:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createImport(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/imports', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * Cancel a staged import and drop its rows. 409 when not staged.
+     * Scope imports:write.
+     * @return array<string,mixed>
+     */
+    public function cancelImport(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/imports/' . rawurlencode($id) . '/cancel', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Commit a staged import (202 with the job, completed or failed). 409 when
+     * not staged; 422 for an entity with no committer. The API REQUIRES an
+     * Idempotency-Key — generated when omitted. Scope imports:commit.
+     * @return array<string,mixed>
+     */
+    public function commitImport(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/imports/' . rawurlencode($id) . '/commit', [], $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    // ── Marketing A/B tests (BC-0196) ────────────────────────────────
+    /**
+     * A/B arms of a campaign with counters and rates. Winner state lives on
+     * the campaign (ab_winner_variant_id, ab_decided_at). Scope marketing:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listCampaignVariants(string $campaignId): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/marketing/campaigns/' . rawurlencode($campaignId) . '/variants')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Configure (replace) the A/B subject test of a DRAFT campaign. 409 when
+     * the campaign is not a draft. Scope marketing_ab:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function configureCampaignAbTest(string $campaignId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->put('/marketing/campaigns/' . rawurlencode($campaignId) . '/ab-test', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Remove the A/B test from a DRAFT campaign. 409 when not a draft.
+     * Scope marketing_ab:write.
+     * @return array<string,mixed>
+     */
+    public function clearCampaignAbTest(string $campaignId, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/marketing/campaigns/' . rawurlencode($campaignId) . '/ab-test', $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    // ── Prospecting saved searches (BC-0196) ─────────────────────────
+    /**
+     * Saved prospecting searches, newest first. Scope prospecting:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listProspectingSavedSearches(array $params = []): array
+    {
+        $res = $this->http->get('/prospecting/saved-searches', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A saved prospecting search. Scope prospecting:read.
+     * @return array<string,mixed>
+     */
+    public function getProspectingSavedSearch(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/prospecting/saved-searches/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Save a prospecting search (201). Counts toward the plan limit (402
+     * PLAN_LIMIT_EXCEEDED); attributed to the user who created the API key
+     * (403 when there is none). Scope prospecting:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createProspectingSavedSearch(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/prospecting/saved-searches', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Update name, filters, sort, columns or alert flags; last_* fields are
+     * read-only. Scope prospecting:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateProspectingSavedSearch(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/prospecting/saved-searches/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a saved prospecting search. Scope prospecting:write.
+     */
+    public function deleteProspectingSavedSearch(string $id, ?string $idempotencyKey = null): void
+    {
+        $this->http->delete('/prospecting/saved-searches/' . rawurlencode($id), $idempotencyKey);
+    }
+
+    /** RFC 4122 v4 UUID for endpoints whose Idempotency-Key is mandatory. */
+    private static function newIdempotencyKey(): string
+    {
+        $b = random_bytes(16);
+        $b[6] = chr((ord($b[6]) & 0x0f) | 0x40);
+        $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
+    }
+
     /**
      * Verify an incoming webhook signature (X-Brivio-Signature: sha256=<hex>).
      * Optionally pass the X-Brivio-Timestamp header value to enforce a replay
