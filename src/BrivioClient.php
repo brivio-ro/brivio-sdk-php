@@ -2390,7 +2390,8 @@ final class BrivioClient
 
     /**
      * Platform mail lane (POST /email/send): RFC 5322 address strings and key=>value tags.
-     * 202 when recorded (status queued|sent|suppressed); 422 from_domain_not_verified;
+    * 202 when recorded (status queued|sent|suppressed); 422 from_domain_not_verified;
+    * 422 sender_identity_missing (verified domain, sending identity not provisioned yet);
      * 502 send_failed. Scope: emails:send.
      *
      * @param array{to: list<string>, subject: string, from?: string, cc?: list<string>, bcc?: list<string>, reply_to?: string, html?: string, text?: string, headers?: array<string,string>, tags?: array<string,string>, category?: string} $input
