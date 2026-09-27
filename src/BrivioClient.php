@@ -2963,6 +2963,114 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Spaces + space transfers (BC-0266, ADR-0214 D8) ──────────────
+    /**
+     * Spaces of the organization, by name. Scope spaces:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSpaces(array $params = []): array
+    {
+        $res = $this->http->get('/spaces', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A space with its members (kind, id, label). Scope spaces:read.
+     * @return array<string,mixed>
+     */
+    public function getSpace(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/spaces/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Create a space (201). Scope spaces:write.
+     * @param array<string,mixed> $input { name, slug?, description? }
+     * @return array<string,mixed>
+     */
+    public function createSpace(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/spaces', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Update a space's name, slug or description. Scope spaces:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateSpace(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/spaces/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a space; its members are released, never deleted. Scope spaces:write.
+     * @return array<string,mixed>
+     */
+    public function deleteSpace(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/spaces/' . rawurlencode($id), $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Add a resource of this organization to a space. Scope spaces:write.
+     * @param string $kind website|custom_domain|dns_zone|hosted_site|registered_domain|email_domain|oauth_client|webhook
+     * @return array<string,mixed>
+     */
+    public function attachSpaceMember(string $spaceId, string $kind, string $resourceId, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/spaces/' . rawurlencode($spaceId) . '/members', ['kind' => $kind, 'resource_id' => $resourceId], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Remove a resource from a space (the resource is untouched). Scope spaces:write.
+     * @return array<string,mixed>
+     */
+    public function detachSpaceMember(string $spaceId, string $kind, string $resourceId, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/spaces/' . rawurlencode($spaceId) . '/members', $idempotencyKey, ['kind' => $kind, 'resource_id' => $resourceId])['data'];
+        return $data;
+    }
+
+    /**
+     * Transfers this organization sent or received (read-only: they are created and
+     * accepted in the app, with a second factor). Scope space_transfers:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSpaceTransfers(array $params = []): array
+    {
+        $res = $this->http->get('/space-transfers', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A space transfer; 404 unless this organization is a party. Scope space_transfers:read.
+     * @return array<string,mixed>
+     */
+    public function getSpaceTransfer(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/space-transfers/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
     /**
      * Delivery routes, newest first. Filters: status, date_from, date_to
      * (YYYY-MM-DD, inclusive), page, per_page. Scope delivery:read.
