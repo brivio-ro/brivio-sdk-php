@@ -2901,6 +2901,68 @@ final class BrivioClient
         return ['data' => $data, 'meta' => $res['meta'] ?? []];
     }
 
+    // ── Vehicle registry + trip sheets (BC-0196 batch B1) ────────────
+    /**
+     * Registry vehicles, by plate (identity only, no owner data). Scope fleet:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listVehicles(array $params = []): array
+    {
+        $res = $this->http->get('/vehicles', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A registry vehicle (a fleet vehicle's registry_vehicle_id). Scope fleet:read.
+     * @return array<string,mixed>
+     */
+    public function getVehicle(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/vehicles/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * A registry vehicle's trip sheets (foi de parcurs), newest first.
+     * driver_name only with fleet_drivers:read. Scope fleet:read.
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listVehicleTripSheets(string $vehicleId, array $params = []): array
+    {
+        $res = $this->http->get('/vehicles/' . rawurlencode($vehicleId) . '/trip-sheets', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Record a trip sheet (201). Scope fleet:write.
+     * @param array<string,mixed> $input { performed_at (ISO 8601), driver_name?, route_from?, route_to?, purpose?, odometer_start_km?, odometer_end_km?, fuel_issued_litres?, notes? }
+     * @return array<string,mixed>
+     */
+    public function createVehicleTripSheet(string $vehicleId, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/vehicles/' . rawurlencode($vehicleId) . '/trip-sheets', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A trip sheet. driver_name only with fleet_drivers:read. Scope fleet:read.
+     * @return array<string,mixed>
+     */
+    public function getTripSheet(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/trip-sheets/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
     /**
      * Delivery routes, newest first. Filters: status, date_from, date_to
      * (YYYY-MM-DD, inclusive), page, per_page. Scope delivery:read.
