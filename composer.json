@@ -1,5 +1,5 @@
 {
-    "name": "brivio/sdk",
+    "name": "brivio-ro/sdk",
     "description": "Official Brivio PHP SDK — invoicing, contacts, articles, locations and module entitlements, plus drop-in compatibility shims for migrating from FGO, SmartBill and Oblio.",
     "type": "library",
     "license": "MIT",

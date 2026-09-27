@@ -608,6 +608,35 @@ final class BrivioClientTest extends TestCase
         self::assertSame('https://api.example/v1/fleet/drivers', $t->url);
     }
 
+    public function testRegistryVehiclesAndTripSheets(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'ts1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listVehicles(['page' => 2]);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/vehicles', $t->url);
+        self::assertStringContainsString('page=2', $t->url);
+
+        $client->getVehicle('v 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v%201', $t->url);
+
+        $client->listVehicleTripSheets('v1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v1/trip-sheets', $t->url);
+
+        $client->createVehicleTripSheet('v1', ['performed_at' => '2026-09-01T08:00:00+03:00', 'odometer_start_km' => 10], 'ts-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v1/trip-sheets', $t->url);
+        self::assertSame(10, $t->decodedBody()['odometer_start_km']);
+        self::assertSame('ts-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getTripSheet('ts1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/trip-sheets/ts1', $t->url);
+    }
+
     public function testDeliveryRoutePathsAndBodies(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'r1'], 'error' => null]);
