@@ -3136,6 +3136,278 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Customs import declarations — DVI (BC-0196 batch C) ────────────────
+
+    /**
+     * Customs import declarations (DVI), newest declaration date first. Scope purchases:read.
+     * @param array<string,mixed> $params page, perPage, status (DRAFT|CONFIRMED|CANCELLED), from, to (YYYY-MM-DD)
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listImportDeclarations(array $params = []): array
+    {
+        $res = $this->http->get('/purchases/import-declarations', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A customs import declaration with its lines and cost allocation. Scope purchases:read.
+     * @return array<string,mixed>
+     */
+    public function getImportDeclaration(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/purchases/import-declarations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Create a DRAFT DVI (201); customs value, VAT base and VAT computed server-side. Scope purchases:write.
+     * @param array<string,mixed> $input snake_case: regime, declaration_date, customs_exchange_rate, vat_rate, lines (required), nir_document_id, customs_duty, ...
+     * @return array<string,mixed>
+     */
+    public function createImportDeclaration(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/purchases/import-declarations', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Confirm a DRAFT DVI (202): posts the customs journal entry (Dr 371/607 = Cr 446;
+     * VAT Dr 4426 = Cr 446 or 4427) and raises the stock cost. Irreversible except by
+     * storno. 409 not_draft; 422 no_period / no_journal / missing_account. The
+     * Idempotency-Key is mandatory — one is generated when omitted. Scope purchases:confirm.
+     * @return array<string,mixed>
+     */
+    public function confirmImportDeclaration(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post(
+            '/purchases/import-declarations/' . rawurlencode($id) . '/confirm',
+            [],
+            $idempotencyKey ?? self::newIdempotencyKey(),
+        )['data'];
+        return $data;
+    }
+
+    // ── SAF-T D406 import (BC-0196 batch C) ─────────────────────────────────
+    // The file never passes through the API: create → PUT the bytes to
+    // `upload.url` with every `upload.headers` entry → parse → review → apply.
+
+    /**
+     * SAF-T import jobs, newest first. Scope imports:read.
+     * @param array<string, scalar|null> $params page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listSaftImports(array $params = []): array
+    {
+        $res = $this->http->get('/saft/imports', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A SAF-T import job with its preview and, once applied, its result. Scope imports:read.
+     * @return array<string,mixed>
+     */
+    public function getSaftImport(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/saft/imports/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Create a SAF-T import job and get a signed PUT URL (201). 503 when storage
+     * is not configured. Scope saft_import:write.
+     * @param array<string,mixed> $input { filename, byte_size (≤ 52428800), sha256 (hex) }
+     * @return array<string,mixed> job fields + upload { url, method, headers, expires_at }
+     */
+    public function createSaftImport(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/saft/imports', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * Verify the uploaded bytes (size + sha256) and store the preview (202).
+     * 409 while the upload is missing. Scope saft_import:write.
+     * @return array<string,mixed>
+     */
+    public function parseSaftImport(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/saft/imports/' . rawurlencode($id) . '/parse', [], $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * Apply a previewed import (202): contacts, products, account links, stock and
+     * opening balances. 409 when already applied. Scope saft_import:write.
+     * @param array<string,mixed> $input sections?, migration_date?, account_mapping?
+     * @return array<string,mixed>
+     */
+    public function applySaftImport(string $id, array $input = [], ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/saft/imports/' . rawurlencode($id) . '/apply', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    // ── Gate & yard (BC-0196 batch C) ───────────────────────────────────────
+    // The driver's identity-document number and phone are deliberately not exposed.
+
+    /**
+     * Gate visits, newest first. Scope gate:read.
+     * @param array<string,mixed> $params status, active (true|false), direction, plate, from, to (ISO), page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listGateVisits(array $params = []): array
+    {
+        $res = $this->http->get('/gate/visits', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * A gate visit with its weighings and timeline. Scope gate:read.
+     * @return array<string,mixed>
+     */
+    public function getGateVisit(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/gate/visits/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Register a vehicle at the gate (201). Scope gate:write.
+     * @param array<string,mixed> $input snake_case: vehicle_plate (required), direction, trailer_plate, driver_name, carrier_id, carrier_name, partner_id, location_id, dock_name, purpose, notes, expected_at, appointment_id
+     * @return array<string,mixed>
+     */
+    public function createGateVisit(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/gate/visits', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Move a visit along the state machine; 409 when not allowed. Scope gate:write.
+     * @param array<string,mixed> $input { to, note?, dock_name? }
+     * @return array<string,mixed>
+     */
+    public function transitionGateVisit(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/gate/visits/' . rawurlencode($id) . '/transitions', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Record a weighbridge reading (201 first, 200 later). Scope gate:write.
+     * @param array<string,mixed> $input { phase: IN|OUT, gross_kg?, tare_kg?, scale_name?, operator_name?, notes? }
+     * @return array<string,mixed>
+     */
+    public function addGateVisitWeighing(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/gate/visits/' . rawurlencode($id) . '/weighings', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Dock appointments by slot start. Scope gate:read.
+     * @param array<string,mixed> $params status, dock_name, from, to, page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listDockAppointments(array $params = []): array
+    {
+        $res = $this->http->get('/gate/dock-appointments', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Book a dock slot (201); 409 on overlap. Scope gate:write.
+     * @param array<string,mixed> $input slot_start, slot_end (required), direction, location_id, dock_name, vehicle_plate, driver_name, carrier_id, carrier_name, partner_id, reference, notes
+     * @return array<string,mixed>
+     */
+    public function createDockAppointment(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/gate/dock-appointments', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * A dock appointment. Scope gate:read.
+     * @return array<string,mixed>
+     */
+    public function getDockAppointment(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/gate/dock-appointments/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Update a dock appointment (partial); status CANCELLED cancels it. Scope gate:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateDockAppointment(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/gate/dock-appointments/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    // ── Accountant access grants (BC-0196 batch C) ──────────────────────────
+    // List, request and revoke only. There is deliberately no approve method:
+    // approval is the client admin's decision in the app.
+
+    /**
+     * Grants where the key's organization is either side. Scope grants:read.
+     * @param array<string,mixed> $params role (cabinet|client), status (pending|active|revoked), page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listAccessGrants(array $params = []): array
+    {
+        $res = $this->http->get('/cabinet/access-grants', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * The cabinet requests access to a linked client (201 new, 200 existing live grant). Scope grants:write.
+     * @return array<string,mixed> { id, status, client_org_id, created }
+     */
+    public function requestAccessGrant(string $clientOrgId, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/cabinet/access-grants', ['client_org_id' => $clientOrgId], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Revoke a pending or active grant from either side. Scope grants:write.
+     * @return array<string,mixed>
+     */
+    public function revokeAccessGrant(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/cabinet/access-grants/' . rawurlencode($id) . '/revoke', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
     /** RFC 4122 v4 UUID for endpoints whose Idempotency-Key is mandatory. */
     private static function newIdempotencyKey(): string
     {
