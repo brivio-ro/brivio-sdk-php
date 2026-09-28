@@ -1460,6 +1460,82 @@ final class BrivioClient
         $this->http->delete('/contracts/' . rawurlencode($id));
     }
 
+    // ── Contract obligations (L-R4-CONTR-05) ───────────────────────────
+    /**
+     * The obligations register across contracts, oldest due first.
+     * Filters: contract_id, bucket (open|overdue|due_soon|upcoming|undated|done),
+     * obligor (us|counterparty), assignee_user_id, q, page, perPage.
+     *
+     * @param array<string, scalar|null> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listContractObligations(array $params = []): array
+    {
+        $res = $this->http->get('/contract-obligations', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * 422 ASSIGNEE_NOT_MEMBER / DOCUMENT_NOT_FOUND for references outside the org.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createContractObligation(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/contract-obligations', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function getContractObligation(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/contract-obligations/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function updateContractObligation(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/contract-obligations/' . rawurlencode($id), $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    public function deleteContractObligation(string $id): void
+    {
+        $this->http->delete('/contract-obligations/' . rawurlencode($id));
+    }
+
+    /**
+     * Complete an obligation. Our own payment/delivery/report obligations need
+     * `evidence_document_id` or `evidence_note` (422 EVIDENCE_REQUIRED); 409 when done.
+     *
+     * @param array{evidence_document_id?: string, evidence_note?: string} $evidence
+     * @return array{obligation: array<string,mixed>, next: array<string,mixed>|null}
+     */
+    public function completeContractObligation(string $id, array $evidence = [], ?string $idempotencyKey = null): array
+    {
+        /** @var array{obligation: array<string,mixed>, next: array<string,mixed>|null} $data */
+        $data = $this->http->post('/contract-obligations/' . rawurlencode($id) . '/complete', $evidence, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    public function reopenContractObligation(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/contract-obligations/' . rawurlencode($id) . '/reopen', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
     /**
      * Get an expense by ID.
      *
