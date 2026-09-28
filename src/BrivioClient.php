@@ -1420,6 +1420,45 @@ final class BrivioClient
     }
 
     /**
+     * A project's team with each person's org-wide weekly load vs capacity (L-R4-PROJ-07).
+     *
+     * @param array{from?:string,weeks?:int} $params
+     * @return array<string,mixed>
+     */
+    public function listProjectAllocations(string $id, array $params = []): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/projects/' . rawurlencode($id) . '/allocations', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Book a person on a project for one ISO week (0 hours clears); the result carries over_allocated (L-R4-PROJ-07).
+     *
+     * @param array{user_id:string,week_start:string,allocated_hours:float|int,role?:?string,note?:?string} $input
+     * @return array<string,mixed>
+     */
+    public function setProjectAllocation(string $id, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->put('/projects/' . rawurlencode($id) . '/allocations', $input, $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * People x ISO weeks across the org: allocated vs available hours (L-R4-PROJ-07).
+     *
+     * @param array{from?:string,weeks?:int} $params
+     * @return array<string,mixed>
+     */
+    public function getResourcing(array $params = []): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/resourcing', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
      * Get a project by ID.
      *
      * @return array<string,mixed>
