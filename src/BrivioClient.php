@@ -1395,6 +1395,31 @@ final class BrivioClient
     }
 
     /**
+     * List a kit's components (BUNDLE articles only, ADR-0225).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listArticleComponents(string $id): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/articles/' . rawurlencode($id) . '/components')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Replace a kit's components; each item: component_article_id, quantity, is_optional?, option_group?, substitutes? (ADR-0225).
+     *
+     * @param list<array<string,mixed>> $components
+     * @return list<array<string,mixed>>
+     */
+    public function setArticleComponents(string $id, array $components, ?string $idempotencyKey = null): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->put('/articles/' . rawurlencode($id) . '/components', ['components' => $components], $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    /**
      * Get a project by ID.
      *
      * @return array<string,mixed>
