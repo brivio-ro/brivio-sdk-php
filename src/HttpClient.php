@@ -91,11 +91,15 @@ final class HttpClient
     }
 
     /**
+     * `$body` is for the few DELETEs that name what to remove in the body
+     * (e.g. DELETE /spaces/{id}/members `{kind, resource_id}`); null sends none.
+     *
+     * @param array<string, mixed>|null $body
      * @return array{data: mixed, meta?: array<string,mixed>}
      */
-    public function delete(string $path): array
+    public function delete(string $path, ?string $idempotencyKey = null, ?array $body = null): array
     {
-        return $this->request('DELETE', $path, null);
+        return $this->request('DELETE', $path, $body === null ? null : self::encode($body), $idempotencyKey);
     }
 
     /**
