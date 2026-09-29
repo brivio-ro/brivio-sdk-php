@@ -34,17 +34,45 @@ final class HttpClient
     }
 
     /**
+     * With `$raw = true` the body is returned undecoded as `['data' => bytes]`
+     * (binary resources such as an invoice PDF); a non-2xx still throws with
+     * the envelope's error when the server sent one.
+     *
      * @param array<string, scalar|null> $query
      * @return array{data: mixed, meta?: array<string,mixed>}
      */
-    public function get(string $path, array $query = []): array
+    public function get(string $path, array $query = [], bool $raw = false): array
     {
         $qs = '';
         $filtered = array_filter($query, static fn ($v) => $v !== null);
         if ($filtered !== []) {
             $qs = '?' . http_build_query($filtered);
         }
+        if ($raw) {
+            return $this->requestRaw('GET', $path . $qs);
+        }
         return $this->request('GET', $path . $qs, null);
+    }
+
+    /**
+     * @return array{data: string, meta: array<string,mixed>}
+     */
+    private function requestRaw(string $method, string $path): array
+    {
+        $headers = ['Authorization' => 'Bearer ' . $this->apiKey, 'Accept' => '*/*'];
+        /** @var array{status:int, body:string} $res */
+        $res = ($this->transport)($method, $this->baseUrl . $path, $headers, null);
+        if ($res['status'] >= 400) {
+            /** @var array{error?: array{code?:string,message?:string}}|null $json */
+            $json = json_decode($res['body'], true);
+            $err = is_array($json) ? ($json['error'] ?? []) : [];
+            throw new BrivioException(
+                $err['message'] ?? ('HTTP ' . $res['status']),
+                $err['code'] ?? 'INTERNAL_ERROR',
+                $res['status'],
+            );
+        }
+        return ['data' => $res['body'], 'meta' => []];
     }
 
     /**

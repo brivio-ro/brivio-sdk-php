@@ -1,4 +1,4 @@
-# Brivio PHP SDK (`brivio/sdk`)
+# Brivio PHP SDK (`brivio-ro/sdk`)
 
 Official PHP SDK for the [Brivio](https://brivio.ro) public API — invoicing,
 contacts, articles, locations and module entitlements — plus **drop-in
@@ -8,7 +8,7 @@ with minimal code changes.
 ## Install
 
 ```bash
-composer require brivio/sdk
+composer require brivio-ro/sdk
 ```
 
 ## Why this directory has no `package.json`

@@ -363,4 +363,528 @@ final class BrivioClientTest extends TestCase
         $client->listEmployees(['department' => 'Vanzari']);
         self::assertStringContainsString('/hr/employees', (string) $t->url);
     }
+
+    public function testParityMethodsBuildPathsAndVerbs(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'x'], 'meta' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->acceptOffer('q 1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/network/quotes/q%201/accept', (string) $t->url);
+
+        $client->sendEmail(['to' => [['email' => 'a@b.ro']], 'subject' => 'Hi', 'category' => 'transactional', 'text' => 'x'], 'idem-1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/emails/send', (string) $t->url);
+        self::assertSame('transactional', $t->decodedBody()['category']);
+        self::assertSame('idem-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->sendEmailMessage(['to' => ['Ana <a@b.ro>'], 'subject' => 'Hi', 'text' => 'x', 'tags' => ['kind' => 'alert']], 'idem-2');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/email/send', (string) $t->url);
+        self::assertSame(['Ana <a@b.ro>'], $t->decodedBody()['to']);
+        self::assertSame('idem-2', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getEmailMessage('m 1');
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/email/messages/m%201', (string) $t->url);
+
+        $client->verifyEmailDomain('d1');
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/email-domains/d1/verify', (string) $t->url);
+
+        $client->deleteEmailDomain('d1');
+        self::assertSame('DELETE', $t->method);
+
+        $client->listPaymentMethods('cust_9');
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/payment-methods', (string) $t->url);
+        self::assertStringContainsString('external_customer_id=cust_9', (string) $t->url);
+
+        $client->rotateApiKey('k1', ['grace_period_hours' => 1]);
+        self::assertSame('POST', $t->method);
+        self::assertStringContainsString('/api-keys/k1/rotate', (string) $t->url);
+        self::assertSame(1, $t->decodedBody()['grace_period_hours']);
+
+        $client->listSites();
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('/sites', (string) $t->url);
+    }
+
+    public function testSaftGenerationPathsAndGeneratedIdempotencyKey(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'g1', 'status' => 'queued'], 'error' => null], 202);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->createSaftGeneration(['fiscal_year_id' => 'fy1', 'variant' => 'monthly']);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/saft/generations', $t->url);
+        self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $t->headers['Idempotency-Key'] ?? '');
+        $first = $t->headers['Idempotency-Key'];
+        $client->createSaftGeneration(['fiscal_year_id' => 'fy1']);
+        self::assertNotSame($first, $t->headers['Idempotency-Key'] ?? null);
+        $client->createSaftGeneration([], 'mine');
+        self::assertSame('mine', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listSaftGenerations(['fiscal_year_id' => 'fy1']);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/saft/generations?fiscal_year_id=fy1', $t->url);
+        $client->getSaftGeneration('g 1');
+        self::assertSame('https://api.example/v1/saft/generations/g%201', $t->url);
+        $client->listSaftGenerationFindings('g1');
+        self::assertSame('https://api.example/v1/saft/generations/g1/findings', $t->url);
+        $client->getSaftGenerationDownload('g1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/saft/generations/g1/download', $t->url);
+    }
+
+    public function testExportPathsIdempotencyAndSignedUrlDownload(): void
+    {
+        $t = new FakeTransport(['data' => ['url' => 'https://gcs/x', 'filename' => 'e.csv', 'sha256' => 'ab'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->createExport(['entity' => 'contacts', 'format' => 'csv']);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/exports', $t->url);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+        self::assertSame('contacts', $t->decodedBody()['entity']);
+
+        $client->listExports(['page' => 2]);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/exports?page=2', $t->url);
+        $client->getExport('e1');
+        self::assertSame('https://api.example/v1/exports/e1', $t->url);
+
+        $dl = $client->downloadExport('e1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/exports/e1/download', $t->url);
+        self::assertSame('https://gcs/x', $dl['url']);
+        self::assertArrayNotHasKey('Idempotency-Key', $t->headers);
+    }
+
+    public function testDownloadExportReturnsRawBytesForLegacyRows(): void
+    {
+        $transport = static fn (string $m, string $u, array $h, ?string $b): array => ['status' => 200, 'body' => "id,name\n1,ACME\n"];
+        $client = new BrivioClient('k', 'https://api.example/v1', $transport);
+        self::assertSame(['bytes' => "id,name\n1,ACME\n"], $client->downloadExport('e1'));
+    }
+
+    public function testDownloadExportThrowsOnExpired(): void
+    {
+        $t = new FakeTransport(['data' => null, 'error' => ['code' => 'NOT_FOUND', 'message' => 'expired']], 410);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $this->expectException(BrivioException::class);
+        $client->downloadExport('e1');
+    }
+
+    public function testImportPathsAndIdempotency(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'j1', 'status' => 'staged'], 'error' => null], 202);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->createImport(['entity' => 'contacts', 'rows' => [['name' => 'ACME']]]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/imports', $t->url);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+
+        $client->commitImport('j1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/imports/j1/commit', $t->url);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+
+        $client->cancelImport('j1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/imports/j1/cancel', $t->url);
+        self::assertArrayNotHasKey('Idempotency-Key', $t->headers);
+        $client->cancelImport('j1', 'c-1');
+        self::assertSame('c-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listImports();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/imports', $t->url);
+        $client->getImport('j1');
+        self::assertSame('https://api.example/v1/imports/j1', $t->url);
+        $client->listImportErrors('j1', ['page' => 3]);
+        self::assertSame('https://api.example/v1/imports/j1/errors?page=3', $t->url);
+    }
+
+    public function testCampaignAbTestPaths(): void
+    {
+        $t = new FakeTransport(['data' => [['id' => 'v1']], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        self::assertSame([['id' => 'v1']], $client->listCampaignVariants('c1'));
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/marketing/campaigns/c1/variants', $t->url);
+
+        $client->configureCampaignAbTest('c1', ['variants' => [['subject' => 'A'], ['subject' => 'B']]], 'ab-1');
+        self::assertSame('PUT', $t->method);
+        self::assertSame('https://api.example/v1/marketing/campaigns/c1/ab-test', $t->url);
+        self::assertSame('ab-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->clearCampaignAbTest('c1', 'ab-2');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/marketing/campaigns/c1/ab-test', $t->url);
+        self::assertSame('ab-2', $t->headers['Idempotency-Key'] ?? null);
+    }
+
+    public function testProspectingSavedSearchPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 's1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listProspectingSavedSearches();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/prospecting/saved-searches', $t->url);
+        $client->createProspectingSavedSearch(['name' => 'IT Cluj', 'filters' => ['county' => 'CJ']]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('IT Cluj', $t->decodedBody()['name']);
+        $client->getProspectingSavedSearch('s1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/prospecting/saved-searches/s1', $t->url);
+        $client->updateProspectingSavedSearch('s1', ['name' => 'X']);
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/prospecting/saved-searches/s1', $t->url);
+        $client->deleteProspectingSavedSearch('s1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/prospecting/saved-searches/s1', $t->url);
+    }
+
+    public function testFleetPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'v1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listFleetVehicles();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles', $t->url);
+
+        $client->createFleetVehicle(['plate' => 'B 01 ABC'], 'fv-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles', $t->url);
+        self::assertSame('B 01 ABC', $t->decodedBody()['plate']);
+        self::assertSame('fv-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getFleetVehicle('v1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1', $t->url);
+
+        $client->updateFleetVehicle('v1', ['status' => 'SOLD']);
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1', $t->url);
+        self::assertSame('SOLD', $t->decodedBody()['status']);
+
+        $client->deleteFleetVehicle('v1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1', $t->url);
+    }
+
+    public function testFleetNestedLogPathsAndDrivers(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'l1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listFleetOdometerReadings('v 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v%201/odometer-readings', $t->url);
+
+        $client->createFleetOdometerReading('v1', ['reading_km' => 12000, 'reading_date' => '2026-09-01'], 'odo-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1/odometer-readings', $t->url);
+        self::assertSame(12000, $t->decodedBody()['reading_km']);
+        self::assertSame('odo-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listFleetServiceLogs('v1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1/service-logs', $t->url);
+
+        $client->createFleetServiceLog('v1', ['service_date' => '2026-09-01', 'type' => 'ITP']);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/fleet/vehicles/v1/service-logs', $t->url);
+        self::assertSame('ITP', $t->decodedBody()['type']);
+
+        $client->listFleetDrivers();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/fleet/drivers', $t->url);
+    }
+
+    public function testRegistryVehiclesAndTripSheets(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'ts1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listVehicles(['page' => 2]);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/vehicles', $t->url);
+        self::assertStringContainsString('page=2', $t->url);
+
+        $client->getVehicle('v 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v%201', $t->url);
+
+        $client->listVehicleTripSheets('v1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v1/trip-sheets', $t->url);
+
+        $client->createVehicleTripSheet('v1', ['performed_at' => '2026-09-01T08:00:00+03:00', 'odometer_start_km' => 10], 'ts-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/vehicles/v1/trip-sheets', $t->url);
+        self::assertSame(10, $t->decodedBody()['odometer_start_km']);
+        self::assertSame('ts-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getTripSheet('ts1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/trip-sheets/ts1', $t->url);
+    }
+
+    public function testDeliveryRoutePathsAndBodies(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'r1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listDeliveryRoutes(['status' => 'PLANNED', 'date_from' => '2026-09-01']);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes?status=PLANNED&date_from=2026-09-01', $t->url);
+
+        $client->createDeliveryRoute(['name' => 'Luni'], 'c-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes', $t->url);
+        self::assertSame('Luni', $t->decodedBody()['name']);
+        self::assertSame('c-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getDeliveryRoute('r 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r%201', $t->url);
+
+        $client->updateDeliveryRoute('r1', ['name' => 'Marti']);
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1', $t->url);
+        self::assertSame('Marti', $t->decodedBody()['name']);
+
+        $client->cancelDeliveryRoute('r1');
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('CANCELLED', $t->decodedBody()['status']);
+
+        $client->listDeliveryRouteStops('r1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1/stops', $t->url);
+
+        $client->addDeliveryRouteStop('r1', ['address' => ['city' => 'Cluj']]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1/stops', $t->url);
+        self::assertSame('Cluj', $t->decodedBody()['address']['city']);
+
+        $client->removeDeliveryRouteStop('r1', 's 1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1/stops/s%201', $t->url);
+    }
+
+    public function testDeliveryRouteOptimizeAndDispatchAlwaysSendAnIdempotencyKey(): void
+    {
+        $t = new FakeTransport(['data' => ['route_id' => 'r1', 'sent_to_driver' => true], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $uuid = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/';
+
+        $client->optimizeDeliveryRoute('r1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1/optimize', $t->url);
+        self::assertMatchesRegularExpression($uuid, $t->headers['Idempotency-Key'] ?? '');
+
+        $client->dispatchDeliveryRoute('r1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r1/dispatch', $t->url);
+        self::assertMatchesRegularExpression($uuid, $t->headers['Idempotency-Key'] ?? '');
+        $first = $t->headers['Idempotency-Key'];
+
+        $client->dispatchDeliveryRoute('r1');
+        self::assertNotSame($first, $t->headers['Idempotency-Key'] ?? null);
+
+        $client->dispatchDeliveryRoute('r1', 'mine');
+        self::assertSame('mine', $t->headers['Idempotency-Key'] ?? null);
+        $client->optimizeDeliveryRoute('r1', 'opt-1');
+        self::assertSame('opt-1', $t->headers['Idempotency-Key'] ?? null);
+    }
+
+    public function testCourtCasePaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'c1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listCourtCases(['status' => 'OPEN']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/legal/court-cases', $t->url);
+        self::assertStringContainsString('status=OPEN', $t->url);
+
+        $client->createCourtCase(['case_number' => '123/3/2026'], 'idem-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases', $t->url);
+        self::assertSame('123/3/2026', $t->decodedBody()['case_number']);
+        self::assertSame('idem-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getCourtCase('c1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1', $t->url);
+
+        $client->updateCourtCase('c1', ['status' => 'WON']);
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1', $t->url);
+        self::assertSame('WON', $t->decodedBody()['status']);
+
+        $client->deleteCourtCase('c1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1', $t->url);
+    }
+
+    public function testCourtCaseChildPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'h1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listCourtCaseHearings('c 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c%201/hearings', $t->url);
+
+        $client->createCourtCaseHearing('c1', ['hearing_date' => '2026-10-01']);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1/hearings', $t->url);
+        self::assertSame('2026-10-01', $t->decodedBody()['hearing_date']);
+
+        $client->listCourtCaseNotes('c1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1/notes', $t->url);
+
+        $client->createCourtCaseNote('c1', ['content' => 'Depus intampinare', 'is_internal' => true]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/legal/court-cases/c1/notes', $t->url);
+        self::assertSame('Depus intampinare', $t->decodedBody()['content']);
+    }
+
+    public function testImportDeclarationPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'd1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listImportDeclarations(['status' => 'DRAFT', 'from' => '2026-09-01']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/purchases/import-declarations', $t->url);
+        self::assertStringContainsString('status=DRAFT', $t->url);
+
+        $client->getImportDeclaration('d 1');
+        self::assertSame('https://api.example/v1/purchases/import-declarations/d%201', $t->url);
+
+        $client->createImportDeclaration(['regime' => 'DEFERRED', 'declaration_date' => '2026-09-10'], 'dvi-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/purchases/import-declarations', $t->url);
+        self::assertSame('DEFERRED', $t->decodedBody()['regime']);
+        self::assertSame('dvi-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->confirmImportDeclaration('d1', 'conf-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/purchases/import-declarations/d1/confirm', $t->url);
+        self::assertSame('conf-1', $t->headers['Idempotency-Key'] ?? null);
+        $client->confirmImportDeclaration('d1');
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+    }
+
+    public function testSaftImportPathsAlwaysSendAnIdempotencyKeyOnWrites(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 's1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->createSaftImport(['filename' => 'd406.xml', 'byte_size' => 10, 'sha256' => str_repeat('a', 64)]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/saft/imports', $t->url);
+        self::assertSame('d406.xml', $t->decodedBody()['filename']);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+
+        $client->parseSaftImport('s1', 'p-1');
+        self::assertSame('https://api.example/v1/saft/imports/s1/parse', $t->url);
+        self::assertSame('p-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->applySaftImport('s1', ['migration_date' => '2026-01-01']);
+        self::assertSame('https://api.example/v1/saft/imports/s1/apply', $t->url);
+        self::assertSame('2026-01-01', $t->decodedBody()['migration_date']);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? '');
+
+        $client->listSaftImports(['page' => 2]);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/saft/imports?page=2', $t->url);
+        $client->getSaftImport('s 1');
+        self::assertSame('https://api.example/v1/saft/imports/s%201', $t->url);
+    }
+
+    public function testGateVisitPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'g1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listGateVisits(['status' => 'AT_GATE']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/gate/visits', $t->url);
+        self::assertStringContainsString('status=AT_GATE', $t->url);
+
+        $client->createGateVisit(['vehicle_plate' => 'B 01 ABC'], 'gv-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/gate/visits', $t->url);
+        self::assertSame('B 01 ABC', $t->decodedBody()['vehicle_plate']);
+        self::assertSame('gv-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getGateVisit('g 1');
+        self::assertSame('https://api.example/v1/gate/visits/g%201', $t->url);
+
+        $client->transitionGateVisit('g1', ['to' => 'CHECKED_IN', 'note' => 'ok']);
+        self::assertSame('https://api.example/v1/gate/visits/g1/transitions', $t->url);
+        self::assertSame('CHECKED_IN', $t->decodedBody()['to']);
+
+        $client->addGateVisitWeighing('g1', ['phase' => 'IN', 'gross_kg' => 12000]);
+        self::assertSame('https://api.example/v1/gate/visits/g1/weighings', $t->url);
+        self::assertSame(12000, $t->decodedBody()['gross_kg']);
+    }
+
+    public function testDockAppointmentPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'a1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listDockAppointments();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/gate/dock-appointments', $t->url);
+
+        $client->createDockAppointment(['slot_start' => '2026-09-01T10:00:00Z', 'slot_end' => '2026-09-01T11:00:00Z'], 'da-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('da-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getDockAppointment('a1');
+        self::assertSame('https://api.example/v1/gate/dock-appointments/a1', $t->url);
+
+        $client->updateDockAppointment('a1', ['status' => 'CANCELLED']);
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/gate/dock-appointments/a1', $t->url);
+        self::assertSame('CANCELLED', $t->decodedBody()['status']);
+    }
+
+    public function testAccessGrantPathsAndNoApproveMethod(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'ag1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listAccessGrants(['role' => 'cabinet', 'status' => 'pending']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/cabinet/access-grants', $t->url);
+        self::assertStringContainsString('role=cabinet', $t->url);
+
+        $client->requestAccessGrant('org-2');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/cabinet/access-grants', $t->url);
+        self::assertSame('org-2', $t->decodedBody()['client_org_id']);
+
+        $client->revokeAccessGrant('ag 1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/cabinet/access-grants/ag%201/revoke', $t->url);
+
+        foreach (get_class_methods($client) as $m) {
+            self::assertDoesNotMatchRegularExpression('/approve/i', $m);
+        }
+    }
+
 }
