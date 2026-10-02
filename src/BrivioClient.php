@@ -2116,6 +2116,18 @@ final class BrivioClient
         return $data;
     }
 
+    /**
+     * ANAF risk score (0–100) per active managed client, with the signals behind it (scope: accounting:read).
+     *
+     * @return array<string,mixed>|list<array<string,mixed>>
+     */
+    public function getCabinetRisk(): array
+    {
+        /** @var array<string,mixed>|list<array<string,mixed>> $data */
+        $data = $this->http->get('/cabinet/risk')['data'] ?? [];
+        return $data;
+    }
+
     // ── Storefront verticals — orders, bookings, reservations, catalog, customers (BC-0194) ───
 
     /**
