@@ -3224,6 +3224,43 @@ final class BrivioClient
     }
 
     /**
+     * ADR-0260: the paired display — device, org branding, config, available
+     * screens. Scope display:read.
+     * @return array<string,mixed>
+     */
+    public function getDisplayMe(): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/display/me')['data'];
+        return $data;
+    }
+
+    /**
+     * ADR-0260: read-only data for one screen (pulse, feed, present, kitchen,
+     * orders, bookings, gate, promo). Money is integer minor units. Scope display:read.
+     * @return array<string,mixed>
+     */
+    public function getDisplaySnapshot(string $screen): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/display/snapshot', ['screen' => $screen])['data'];
+        return $data;
+    }
+
+    /**
+     * ADR-0260: ask the display assistant about the pulse data.
+     * Scope display:assistant.
+     * @param array<string,mixed> $input { text?, audio?, mime?, locale? }
+     * @return array<string,mixed>
+     */
+    public function askDisplayAssistant(array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/display/assistant', $input)['data'];
+        return $data;
+    }
+
+    /**
      * Delivery routes, newest first. Filters: status, date_from, date_to
      * (YYYY-MM-DD, inclusive), page, per_page. Scope delivery:read.
      * @param array<string,scalar> $params
