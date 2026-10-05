@@ -74,16 +74,26 @@ $hook = $brivio->createWebhook([
 ]);
 // $hook['secret'] is returned ONCE — store it for signature verification.
 
-// Incoming webhook verification (raw body + headers):
-$ok = \Brivio\BrivioClient::verifyWebhookSignature(
-    $rawBody,
-    $_SERVER['HTTP_X_BRIVIO_SIGNATURE'],   // "sha256=<hex>"
-    $secret,
-    $_SERVER['HTTP_X_BRIVIO_TIMESTAMP'],   // optional replay protection
+// Incoming webhook verification — Standard Webhooks (every event, incl. email.received):
+$ok = \Brivio\BrivioClient::verifyStandardWebhook(
+    file_get_contents('php://input'),       // raw body, never re-encoded JSON
+    $_SERVER['HTTP_WEBHOOK_ID'],
+    $_SERVER['HTTP_WEBHOOK_TIMESTAMP'],
+    $_SERVER['HTTP_WEBHOOK_SIGNATURE'],     // "v1,<base64> [v1,<base64>]"
+    $secret,                                // "whsec_..."
 );
+// verifyWebhookSignature() checks the retired "X-Brivio-Signature: sha256=<hex>" scheme (kept for back-compat).
 
 $deliveries = $brivio->listWebhookDeliveries($hook['id'], ['status' => 'failed']);
 $brivio->rotateWebhookSecret($hook['id']);  // returns new secret once
+```
+
+Newsletter double opt-in (scope `marketing_subscribers:write`; nothing is sent before the person confirms):
+
+```php
+$sub = $brivio->createMarketingSubscriber([
+    'email' => 'ana@example.ro', 'locale' => 'ro', 'consent' => ['text_version' => '2026-10-05', 'ip' => $_SERVER['REMOTE_ADDR']],
+], 'signup-ana@example.ro');            // $sub['status'] === 'pending'
 ```
 
 Inventory & HR:

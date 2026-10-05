@@ -2286,6 +2286,22 @@ final class BrivioClient
     }
 
     /**
+     * Add a newsletter subscriber with double opt-in (V3-27). Creates a
+     * `pending` subscriber and emails a confirmation link; nothing is sent
+     * before the person confirms. Idempotent per address (200 when known,
+     * 201 when new). Scope marketing_subscribers:write.
+     *
+     * @param array{email: string, consent: array{text_version: string, text?: string, ip?: string, user_agent?: string}, name?: string, locale?: string, source?: string, redirect_url?: string} $input
+     * @return array<string,mixed>
+     */
+    public function createMarketingSubscriber(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/marketing/subscribers', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
      * Marketing campaigns.
      *
      * @param array{channel?: string, status?: string} $params
@@ -3798,5 +3814,49 @@ final class BrivioClient
         $actual = preg_replace('/^sha256=/', '', $signatureHeader) ?? '';
         $expected = hash_hmac('sha256', $payload, $secret);
         return hash_equals($expected, $actual);
+    }
+
+    /**
+     * Verify a Standard Webhooks delivery (headers `webhook-id`,
+     * `webhook-timestamp`, `webhook-signature`). `email.received` and every
+     * other Brivio event are signed this way: HMAC-SHA256 (base64) over
+     * `{id}.{timestamp}.{payload}`, header = space-separated `v1,<b64>` tokens
+     * (several during a secret rotation; any match is accepted). Pass the RAW
+     * request body, not re-encoded JSON.
+     */
+    public static function verifyStandardWebhook(
+        string $payload,
+        string $webhookId,
+        string $webhookTimestamp,
+        string $webhookSignature,
+        string $secret,
+        int $toleranceSec = 300,
+    ): bool {
+        if ($webhookId === '' || $webhookTimestamp === '' || $webhookSignature === '') {
+            return false;
+        }
+        if (preg_match('/^[0-9]+$/', $webhookTimestamp) !== 1) {
+            return false;
+        }
+        $ts = (int) $webhookTimestamp;
+        if ($ts <= 0 || abs(time() - $ts) > $toleranceSec) {
+            return false;
+        }
+
+        // Key = base64 of the part after `whsec_`, only when it round-trips
+        // exactly (legacy `whsec_<hex>` secrets are used as raw bytes).
+        $body = str_starts_with($secret, 'whsec_') ? substr($secret, 6) : $secret;
+        $decoded = base64_decode($body, true);
+        $key = ($decoded !== false && $decoded !== '' && base64_encode($decoded) === $body)
+            ? $decoded
+            : $secret;
+
+        $expected = 'v1,' . base64_encode(hash_hmac('sha256', $webhookId . '.' . $ts . '.' . $payload, $key, true));
+        foreach (explode(' ', $webhookSignature) as $token) {
+            if ($token !== '' && hash_equals($expected, $token)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

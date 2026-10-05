@@ -887,4 +887,42 @@ final class BrivioClientTest extends TestCase
         }
     }
 
+    public function testCreateMarketingSubscriberPostsBodyAndIdempotencyKey(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 's1', 'status' => 'pending', 'confirmation_sent' => true], 'error' => null], 201);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        $sub = $client->createMarketingSubscriber([
+            'email' => 'ana@example.ro',
+            'locale' => 'ro',
+            'consent' => ['text_version' => '2026-10-05', 'ip' => '203.0.113.7'],
+        ], 'idem-sub');
+
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/marketing/subscribers', $t->url);
+        self::assertSame('idem-sub', $t->headers['Idempotency-Key']);
+        self::assertSame('ana@example.ro', $t->decodedBody()['email']);
+        self::assertSame(['text_version' => '2026-10-05', 'ip' => '203.0.113.7'], $t->decodedBody()['consent']);
+        self::assertSame('pending', $sub['status']);
+    }
+
+    public function testVerifyStandardWebhook(): void
+    {
+        $rawKey = str_repeat("\x01\x02\x03\x04", 8);
+        $secret = 'whsec_' . base64_encode($rawKey);
+        $id = 'evt_0123456789abcdef0123456789abcdef';
+        $ts = (string) time();
+        $payload = '{"id":"evt_0123456789abcdef0123456789abcdef","type":"email.received","data":{"object":"email_message"}}';
+        $sig = 'v1,' . base64_encode(hash_hmac('sha256', $id . '.' . $ts . '.' . $payload, $rawKey, true));
+
+        self::assertTrue(BrivioClient::verifyStandardWebhook($payload, $id, $ts, $sig, $secret));
+        // Any token in a rotation list may match.
+        self::assertTrue(BrivioClient::verifyStandardWebhook($payload, $id, $ts, 'v1,AAAA ' . $sig, $secret));
+        // Tampered body.
+        self::assertFalse(BrivioClient::verifyStandardWebhook($payload . ' ', $id, $ts, $sig, $secret));
+        // Stale timestamp, correctly signed for that timestamp.
+        $old = (string) (time() - 3600);
+        $oldSig = 'v1,' . base64_encode(hash_hmac('sha256', $id . '.' . $old . '.' . $payload, $rawKey, true));
+        self::assertFalse(BrivioClient::verifyStandardWebhook($payload, $id, $old, $oldSig, $secret));
+    }
+
 }
