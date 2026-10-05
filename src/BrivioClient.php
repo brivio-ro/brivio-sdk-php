@@ -3252,8 +3252,8 @@ final class BrivioClient
     }
 
     /**
-     * ADR-0260: read-only data for one screen (pulse, feed, present, kitchen,
-     * orders, bookings, gate, promo). Money is integer minor units. Scope display:read.
+        * ADR-0260: read-only data for one screen (pulse, feed, present, kitchen,
+        * orders, bookings, gate, promo, queue, menu, slides). Money is integer minor units. Scope display:read.
      * @return array<string,mixed>
      */
     public function getDisplaySnapshot(string $screen): array
@@ -3273,6 +3273,18 @@ final class BrivioClient
     {
         /** @var array<string,mixed> $data */
         $data = $this->http->post('/display/assistant', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * ADR-0260: server re-check of a locked display's PIN (device tokens only,
+     * 5 attempts/min, audited without the PIN). Scope display:read.
+     * @return array{ok: bool, retryAfterSec: int|null}
+     */
+    public function unlockDisplay(string $pin): array
+    {
+        /** @var array{ok: bool, retryAfterSec: int|null} $data */
+        $data = $this->http->post('/display/unlock', ['pin' => $pin])['data'];
         return $data;
     }
 
