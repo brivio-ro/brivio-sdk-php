@@ -3797,6 +3797,67 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Sales channels & channel orders (ADR-0272) ──────────────────────────
+    // Read-only view of the channel sync engine (eMAG, WooCommerce, Trendyol),
+    // plus retrying an oversold / unmapped order after restock or mapping.
+
+    /**
+     * Connected sales channels with their sync health. Scope orders:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listSalesChannels(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/sales-channels')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * One sales channel. Scope orders:read.
+     * @return array<string,mixed>
+     */
+    public function getSalesChannel(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/sales-channels/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Orders imported from channels. Scope orders:read.
+     * @param array<string,mixed> $params channel_id, status (new|acknowledged|in_progress|shipped|delivered|cancelled|returned|needs_mapping|oversold), updated_since (ISO 8601), page, perPage
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listChannelOrders(array $params = []): array
+    {
+        $res = $this->http->get('/channel-orders', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * One channel order with its lines. Scope orders:read.
+     * @return array<string,mixed>
+     */
+    public function getChannelOrder(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/channel-orders/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Retry stock reservation for an oversold / unmapped order. Scope orders:write.
+     * @return array<string,mixed> { ok, status }
+     */
+    public function retryChannelOrder(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/channel-orders/' . rawurlencode($id) . '/retry', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
     /** RFC 4122 v4 UUID for endpoints whose Idempotency-Key is mandatory. */
     private static function newIdempotencyKey(): string
     {
