@@ -3413,6 +3413,254 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Steluțe rewards programme (ADR-0268, RW-0702) ─────────────────────
+    // Mirrors the TS SDK `client.rewards`. Steluțe are loyalty units, not money.
+
+    /**
+     * Your organization's own programme, created on first use. Scope rewards:read.
+     * @return array<string,mixed>
+     */
+    public function getRewardsProgram(): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/rewards/program')['data'];
+        return $data;
+    }
+
+    /**
+     * Active catalogue of the programme. Scope rewards:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listRewardsCatalog(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/rewards/catalog')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Create or fetch a member by externalRef or customerId. Scope rewards:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function upsertRewardsMember(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/members', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Balance, level, streak and expiry of one member. Scope rewards:read.
+     * @return array<string,mixed>
+     */
+    public function getRewardsMember(string $ref): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/rewards/members/' . rawurlencode($ref))['data'];
+        return $data;
+    }
+
+    /**
+     * Newest ledger movements of a member (limit ≤ 200). Scope rewards:read.
+     * @param array<string,mixed> $params
+     * @return list<array<string,mixed>>
+     */
+    public function listRewardsMemberHistory(string $ref, array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/rewards/members/' . rawurlencode($ref) . '/history', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Redeem a catalogue item for a member. 409 insufficient_units / in_debt. Scope rewards:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createRewardsRedemption(string $ref, array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/members/' . rawurlencode($ref) . '/redemptions', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Record a business event, processed inline. Pass a stable idempotency key
+     * (e.g. "order-123-paid") so a retry awards nothing twice. Scope rewards:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function recordRewardsEvent(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/events', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Reverse what a refunded/voided business object earned. Scope rewards:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createRewardsClawback(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/clawbacks', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Create a widget signing key; the secret is returned ONCE. Scope rewards:write.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createRewardsWidgetKey(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/widget-keys', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Revoke a widget key; its live sessions stop at once. Scope rewards:write.
+     * @return array<string,mixed>
+     */
+    public function revokeRewardsWidgetKey(string $kid): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/rewards/widget-keys/' . rawurlencode($kid))['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * PUBLIC: exchange a host-signed token for a 15-minute read-only widget session.
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public function createRewardsWidgetSession(array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/rewards/widget/session', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * PUBLIC: what the widget renders. Construct a client whose api key is the
+     * widget SESSION token to call this.
+     * @return array<string,mixed>
+     */
+    public function getRewardsWidgetMe(): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/rewards/widget/me')['data'];
+        return $data;
+    }
+
+    // ── Courier hub: shipping points + shipments (ADR-0273) ─────────────────
+    /**
+     * Search lockers, partner shops and courier offices. One anchor required:
+     * near ("lat,lng"), city, postal_code or q. Filters: courier, type (comma
+     * lists), cod, card, open_24_7, weight_kg, radius_km, limit. Scope shipping:read.
+     * @param array<string,mixed> $params
+     * @return list<array<string,mixed>>
+     */
+    public function searchShippingPoints(array $params): array
+    {
+        foreach ($params as $k => $v) {
+            if (is_array($v)) {
+                $params[$k] = implode(',', $v);
+            } elseif (is_bool($v)) {
+                $params[$k] = $v ? 'true' : 'false';
+            }
+        }
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/shipping-points', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Shipments, newest first (status, page, per_page). Scope shipping:read.
+     * @param array<string,mixed> $params
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listShipments(array $params = []): array
+    {
+        $res = $this->http->get('/shipments', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Price a parcel at every configured courier and compare (PARITY API-10).
+     * Creates nothing. Scope shipping:read.
+     * @param array<string,mixed> $input recipient, parcel, cod_amount?, pickup_point_id?, couriers?
+     * @return array<string,mixed> quotes, couriers
+     */
+    public function quoteShipment(array $input): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/shipments/quote', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * Buy an AWB (a real courier cost). REQUIRED Idempotency-Key (generated when
+     * null — pass your own so a retry cannot buy two). Scope shipping:write.
+     * @param array<string,mixed> $input courier, reference, recipient, parcel, …
+     * @return array<string,mixed>
+     */
+    public function createShipment(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/shipments', $input, $idempotencyKey ?? self::newIdempotencyKey())['data'];
+        return $data;
+    }
+
+    /**
+     * A shipment. Scope shipping:read.
+     * @return array<string,mixed>
+     */
+    public function getShipment(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/shipments/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * The AWB label bytes (PDF; ZPL with format "zpl"). Scope shipping:read.
+     */
+    public function getShipmentLabel(string $id, ?string $format = null): string
+    {
+        /** @var string $bytes */
+        $bytes = $this->http->get('/shipments/' . rawurlencode($id) . '/label', ['format' => $format], true)['data'];
+        return $bytes;
+    }
+
+    /**
+     * Refresh tracking from the courier. Scope shipping:read.
+     * @return array<string,mixed>
+     */
+    public function trackShipment(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/shipments/' . rawurlencode($id) . '/tracking')['data'];
+        return $data;
+    }
+
+    /**
+     * Cancel the AWB at the courier. Scope shipping:write.
+     * @return array<string,mixed>
+     */
+    public function cancelShipment(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/shipments/' . rawurlencode($id) . '/cancel', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
     // ── Court cases (BC-0196 batch B) ─────────────────────────────────────────
     /**
      * The organization's own court cases, newest first. Optional `status`

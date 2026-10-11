@@ -637,6 +637,36 @@ final class BrivioClientTest extends TestCase
         self::assertSame('https://api.example/v1/trip-sheets/ts1', $t->url);
     }
 
+    public function testShippingPathsAndBodies(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 's1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->searchShippingPoints(['near' => '46.77,23.59', 'courier' => ['sameday', 'dpd'], 'cod' => true]);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/shipping-points?near=46.77%2C23.59&courier=sameday%2Cdpd&cod=true', $t->url);
+
+        $client->quoteShipment(['recipient' => ['city' => 'Cluj'], 'parcel' => ['weight_kg' => 1]]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/shipments/quote', $t->url);
+
+        $client->createShipment(['courier' => 'dpd'], 'awb-1');
+        self::assertSame('https://api.example/v1/shipments', $t->url);
+        self::assertSame('awb-1', $t->headers['Idempotency-Key'] ?? null);
+        $client->createShipment(['courier' => 'dpd']);
+        self::assertNotEmpty($t->headers['Idempotency-Key'] ?? null);
+
+        $client->getShipment('s 1');
+        self::assertSame('https://api.example/v1/shipments/s%201', $t->url);
+        $client->trackShipment('s1');
+        self::assertSame('https://api.example/v1/shipments/s1/tracking', $t->url);
+        $client->cancelShipment('s1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/shipments/s1/cancel', $t->url);
+        $client->listShipments(['status' => 'in_transit']);
+        self::assertSame('https://api.example/v1/shipments?status=in_transit', $t->url);
+    }
+
     public function testDeliveryRoutePathsAndBodies(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'r1'], 'error' => null]);
