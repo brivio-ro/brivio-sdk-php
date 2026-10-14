@@ -735,6 +735,67 @@ final class BrivioClientTest extends TestCase
         self::assertSame('opt-1', $t->headers['Idempotency-Key'] ?? null);
     }
 
+    public function testDeliveryRouteCostComparisonPathAndMode(): void
+    {
+        $t = new FakeTransport(['data' => ['verdict' => 'FLEET', 'fleetMinor' => 12345, 'breakdown' => null], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $data = $client->getDeliveryRouteCostComparison('r 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/r%201/cost-comparison?mode=marginal', $t->url);
+        self::assertSame('FLEET', $data['verdict']);
+        self::assertSame(12345, $data['fleetMinor']);
+
+        $client->getDeliveryRouteCostComparison('r1', 'full');
+        self::assertSame('https://api.example/v1/delivery-routes/r1/cost-comparison?mode=full', $t->url);
+    }
+
+    public function testDeliveryRouteCostComparisonRejectsUnknownModeBeforeAnyRequest(): void
+    {
+        $t = new FakeTransport(['data' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        try {
+            $client->getDeliveryRouteCostComparison('r1', 'cheap');
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('marginal or full', $e->getMessage());
+        }
+        self::assertNull($t->url);
+    }
+
+    public function testDeliveryRouteCostAnalyticsPathWindowAndMode(): void
+    {
+        $t = new FakeTransport(['data' => ['windowDays' => 30, 'savingMinor' => 900, 'losing' => []], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $data = $client->getDeliveryRouteCostAnalytics();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/delivery-routes/cost-analytics?window=30&mode=marginal', $t->url);
+        self::assertSame(900, $data['savingMinor']);
+
+        $client->getDeliveryRouteCostAnalytics(90, 'full');
+        self::assertSame('https://api.example/v1/delivery-routes/cost-analytics?window=90&mode=full', $t->url);
+    }
+
+    public function testDeliveryRouteCostAnalyticsRejectsBadWindowOrModeBeforeAnyRequest(): void
+    {
+        $t = new FakeTransport(['data' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        try {
+            $client->getDeliveryRouteCostAnalytics(60);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('30 or 90', $e->getMessage());
+        }
+        try {
+            $client->getDeliveryRouteCostAnalytics(30, 'cheap');
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('marginal or full', $e->getMessage());
+        }
+        self::assertNull($t->url);
+    }
+
     public function testCourtCasePaths(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'c1'], 'error' => null]);

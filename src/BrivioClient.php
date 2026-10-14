@@ -3413,6 +3413,49 @@ final class BrivioClient
         return $data;
     }
 
+    /**
+     * Own fleet vs courier for a route (F-VS): fleet cost (`marginal` running costs,
+     * `full` adds depreciation and insurance), the courier price of the same parcels,
+     * verdict FLEET|COURIER|TIE|UNKNOWN, saving, hybrid stops, break-even stop count
+     * and CO₂. Amounts are integer minor units (bani); `breakdown` is always null over
+     * the API. Heavy rate tier. Scope delivery:read.
+     * @param 'marginal'|'full' $mode
+     * @return array<string,mixed> currency, mode, fleetMinor, courierProjectedMinor, savingMinor, verdict, hybridStops, breakEvenStops, co2Grams, …
+     * @throws \InvalidArgumentException when $mode is not marginal|full (no request is sent)
+     */
+    public function getDeliveryRouteCostComparison(string $id, string $mode = 'marginal'): array
+    {
+        if ($mode !== 'marginal' && $mode !== 'full') {
+            throw new \InvalidArgumentException('mode must be marginal or full');
+        }
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/delivery-routes/' . rawurlencode($id) . '/cost-comparison', ['mode' => $mode])['data'];
+        return $data;
+    }
+
+    /**
+     * Own fleet vs courier over the last 30 or 90 days (F-VS), from the cost
+     * snapshots stored when routes were completed: totals, saving, verdict counts,
+     * hybrid saving, CO₂, break-even stop count, estimated share and the routes that
+     * cost more than a courier. Amounts are integer minor units. Scope delivery:read.
+     * @param 30|90 $window
+     * @param 'marginal'|'full' $mode
+     * @return array<string,mixed> windowDays, mode, currency, routes, comparableRoutes, fleetMinor, courierMinor, savingMinor, verdicts, hybridSavingMinor, co2Grams, avgStops, breakEvenStops, estimatedPercent, losing
+     * @throws \InvalidArgumentException when $window is not 30|90 or $mode is not marginal|full (no request is sent)
+     */
+    public function getDeliveryRouteCostAnalytics(int $window = 30, string $mode = 'marginal'): array
+    {
+        if ($window !== 30 && $window !== 90) {
+            throw new \InvalidArgumentException('window must be 30 or 90');
+        }
+        if ($mode !== 'marginal' && $mode !== 'full') {
+            throw new \InvalidArgumentException('mode must be marginal or full');
+        }
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/delivery-routes/cost-analytics', ['window' => (string) $window, 'mode' => $mode])['data'];
+        return $data;
+    }
+
     // ── Steluțe rewards programme (ADR-0268, RW-0702) ─────────────────────
     // Mirrors the TS SDK `client.rewards`. Steluțe are loyalty units, not money.
 
