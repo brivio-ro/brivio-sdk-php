@@ -45,11 +45,13 @@ $contacts = $brivio->listContacts(['search' => 'srl']);
 $contact = $brivio->createContact(['name' => 'ACME SRL', 'vat_number' => 'RO123']);
 
 $invoice = $brivio->createInvoice([
-    'client' => ['name' => 'ACME SRL', 'vat_number' => 'RO123'],
-    'series_name' => 'FACT',
+    'contact_id' => $contact['id'],
+    'series' => 'FACT',
+    'issue_date' => '2026-11-03',
+    'due_date' => '2026-11-17',
     'currency' => 'RON',
-    'lines' => [
-        ['name' => 'Consultanță', 'quantity' => 1, 'unit_price' => 100, 'vat_rate' => 21],
+    'items' => [
+        ['description' => 'Consultanță', 'quantity' => 1, 'unit_price' => 100, 'vat_rate' => 21],
     ],
 ], idempotencyKey: 'order-42'); // optional idempotency
 ```
@@ -60,6 +62,7 @@ Invoices, payments and e-Factura:
 $invoice = $brivio->getInvoice($id);
 $brivio->updateInvoice($id, ['status' => 'SENT']);
 $brivio->submitInvoiceToANAF($id);              // RO e-Factura
+$status = $brivio->getInvoiceEfacturaStatus($id); // GET /invoices/{id}/efactura-status
 $brivio->charge(['amount' => 1000, 'currency' => 'RON', 'order_id' => 'o1']);
 ```
 
@@ -82,7 +85,7 @@ $ok = \Brivio\BrivioClient::verifyStandardWebhook(
     $_SERVER['HTTP_WEBHOOK_SIGNATURE'],     // "v1,<base64> [v1,<base64>]"
     $secret,                                // "whsec_..."
 );
-// verifyWebhookSignature() checks the retired "X-Brivio-Signature: sha256=<hex>" scheme (kept for back-compat).
+// verifyWebhookSignature() only checks the retired pre-Standard-Webhooks scheme (kept for back-compat); new code uses verifyStandardWebhook().
 
 $deliveries = $brivio->listWebhookDeliveries($hook['id'], ['status' => 'failed']);
 $brivio->rotateWebhookSecret($hook['id']);  // returns new secret once
