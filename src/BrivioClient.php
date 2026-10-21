@@ -1713,7 +1713,7 @@ final class BrivioClient
     }
 
     /**
-     * Mark an invoice as sent (DRAFT → SENT; idempotent).
+     * Issue an invoice (DRAFT → SENT; idempotent): VIES, storno association, stock and ledger posting like the app; 409 CONFLICT on a VIES or storno refusal.
      *
      * @return array<string,mixed>
      */
