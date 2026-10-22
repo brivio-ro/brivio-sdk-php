@@ -1052,6 +1052,20 @@ final class BrivioClientTest extends TestCase
         self::assertSame('cd-1', $t->headers['Idempotency-Key'] ?? null);
     }
 
+    public function testStoreAppPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['store_id' => 's1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->getStoreAppProfile('s 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/stores/s%201/app-profile', $t->url);
+
+        $client->getStoreAppDataSafety('s1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/stores/s1/app-profile/data-safety', $t->url);
+    }
+
     public function testMailboxAndAliasPaths(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'm1'], 'error' => null]);

@@ -4439,6 +4439,33 @@ final class BrivioClient
         return (string) $id;
     }
 
+    // ── Store apps (PF-0402, ADR-0307) ──────────────────────────────────────
+    // A store's own Android app. Read-only: the build profile (its `generator`
+    // object is what BRIVIO_STORE_PROFILE consumes) and the Play Data safety /
+    // Apple privacy declaration. 404 when the store has no app.
+
+    /**
+     * The store's Android app profile and build status. Scope sites:read.
+     * @return array<string,mixed>
+     */
+    public function getStoreAppProfile(string $storeId): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/stores/' . rawurlencode($storeId) . '/app-profile')['data'];
+        return $data;
+    }
+
+    /**
+     * What the store's app collects, for Play's Data safety form and Apple's privacy labels. Scope sites:read.
+     * @return array<string,mixed>
+     */
+    public function getStoreAppDataSafety(string $storeId): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/stores/' . rawurlencode($storeId) . '/app-profile/data-safety')['data'];
+        return $data;
+    }
+
     // ── Hosted mailboxes and aliases (PF-0311 g2, ADR-0193) ─────────────────
     // Organization mailboxes only (personal and HR employee mailboxes are
     // never reachable). A mailbox password is generated and sealed
