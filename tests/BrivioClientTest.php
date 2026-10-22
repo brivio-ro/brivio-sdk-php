@@ -1093,6 +1093,39 @@ final class BrivioClientTest extends TestCase
         self::assertSame('ad-1', $t->headers['Idempotency-Key'] ?? null);
     }
 
+    public function testDomainSearchTransferPriceAndOrdersWithoutConfirm(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'o1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->searchDomains('firma', ['ro', 'com']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/domains/search', $t->url);
+        self::assertStringContainsString('query=firma', $t->url);
+        self::assertStringContainsString('tlds=ro%2Ccom', $t->url);
+
+        $client->getDomainTransferPrice('firma.ro');
+        self::assertStringStartsWith('https://api.example/v1/domains/transfer-price', $t->url);
+        self::assertStringContainsString('domain=firma.ro', $t->url);
+
+        $client->createDomainOrder(['kind' => 'transfer', 'domain' => 'firma.ro', 'auth_code' => 'EPP'], 'do-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/domains/orders', $t->url);
+        self::assertSame('transfer', $t->decodedBody()['kind']);
+        self::assertSame('do-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listDomainOrders(['status' => 'pending']);
+        self::assertSame('GET', $t->method);
+        self::assertStringContainsString('status=pending', $t->url);
+
+        $client->getDomainOrder('o 1');
+        self::assertSame('https://api.example/v1/domains/orders/o%201', $t->url);
+
+        foreach (get_class_methods($client) as $m) {
+            self::assertDoesNotMatchRegularExpression('/^(confirm|reject|approve)DomainOrder/i', $m);
+        }
+    }
+
     public function testAccessGrantPathsAndNoApproveMethod(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'ag1'], 'error' => null]);

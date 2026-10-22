@@ -1029,6 +1029,70 @@ final class BrivioClient
         return $data;
     }
 
+    /**
+     * PF-0311 g3: availability + retail price of <query>.<tld> per TLD (default ro, com, eu, net, io). Scope domains:read.
+     * @param list<string> $tlds
+     * @return list<array<string,mixed>>
+     */
+    public function searchDomains(string $query, array $tlds = []): array
+    {
+        $params = ['query' => $query];
+        if ($tlds !== []) {
+            $params['tlds'] = implode(',', $tlds);
+        }
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/domains/search', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * PF-0311 g3: retail transfer price of a domain's TLD. Scope domains:read.
+     * @return array<string,mixed>
+     */
+    public function getDomainTransferPrice(string $domain): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/domains/transfer-price', ['domain' => $domain])['data'];
+        return $data;
+    }
+
+    /**
+     * PF-0311 g4 (ADR-0306): ORDER a domain registration or transfer. NOT a purchase: the order stays
+     * pending until an org admin confirms it in Brivio with a second factor (confirm_url). Never returns
+     * the auth code. Scope domains:write.
+     * @param array<string,mixed> $input kind, domain (required), period, auth_code
+     * @return array<string,mixed>
+     */
+    public function createDomainOrder(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/domains/orders', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * PF-0311 g4: the organization's domain orders, newest first. Scope domains:read.
+     * @param array<string,mixed> $params status
+     * @return list<array<string,mixed>>
+     */
+    public function listDomainOrders(array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/domains/orders', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * PF-0311 g4: one domain order. Scope domains:read.
+     * @return array<string,mixed>
+     */
+    public function getDomainOrder(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/domains/orders/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
         // ── API keys ──────────────────────────────────────────────────────
         /**
          * List API keys for the organization (mirrors TS ApiKeysClient::list).
