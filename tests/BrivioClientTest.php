@@ -1015,6 +1015,40 @@ final class BrivioClientTest extends TestCase
         self::assertSame('https://api.example/v1/costs/subscriptions/s1', $t->url);
     }
 
+    public function testCustomHostnamePaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'h1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listCustomHostnames();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames', $t->url);
+
+        $client->getCustomHostname('h 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames/h%201', $t->url);
+
+        $client->createCustomHostname(['domain' => 'shop.example.ro', 'target' => 'tenant'], 'ch-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames', $t->url);
+        self::assertSame('shop.example.ro', $t->decodedBody()['domain']);
+        self::assertSame('ch-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->verifyCustomHostname('h 1', 'cv-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames/h%201/verify', $t->url);
+        self::assertSame('cv-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->getCustomHostnameDnsInstructions('h1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames/h1/dns-instructions', $t->url);
+
+        $client->deleteCustomHostname('h 1', 'cd-1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/custom-hostnames/h%201', $t->url);
+        self::assertSame('cd-1', $t->headers['Idempotency-Key'] ?? null);
+    }
+
     public function testAccessGrantPathsAndNoApproveMethod(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'ag1'], 'error' => null]);

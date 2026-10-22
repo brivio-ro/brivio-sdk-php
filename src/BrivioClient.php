@@ -4181,6 +4181,80 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Custom hostnames (PF-0311, ADR-0198) ────────────────────────────────
+    // Claim a hostname in the API key's environment, publish the records from
+    // getCustomHostnameDnsInstructions(), then verify until it is active.
+    // Deleting releases the Cloudflare hostname first (502 + delete_failed
+    // when Cloudflare refuses; retry). Not paginated.
+
+    /**
+     * The organization's custom hostnames. Scope sites:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listCustomHostnames(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/custom-hostnames')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * One custom hostname. Scope sites:read.
+     * @return array<string,mixed>
+     */
+    public function getCustomHostname(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/custom-hostnames/' . rawurlencode($id))['data'];
+        return $data;
+    }
+
+    /**
+     * Claim a custom hostname (201 created / 200 already this org's; returns { id, domain, created }).
+     * 409 when another organization or account holds it. Scope sites:write.
+     * @param array<string,mixed> $input domain (required), target (store|site|tenant), site_id
+     * @return array<string,mixed>
+     */
+    public function createCustomHostname(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/custom-hostnames', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Re-check TXT ownership, CNAME and the Cloudflare hostname (returns { status, verified, points_to_us, ... }). Scope sites:write.
+     * @return array<string,mixed>
+     */
+    public function verifyCustomHostname(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/custom-hostnames/' . rawurlencode($id) . '/verify', [], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * The DNS records to publish: txt, cname and Cloudflare dcv records. Scope sites:read.
+     * @return array<string,mixed>
+     */
+    public function getCustomHostnameDnsInstructions(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/custom-hostnames/' . rawurlencode($id) . '/dns-instructions')['data'];
+        return $data;
+    }
+
+    /**
+     * Release and delete a custom hostname (returns { id, deleted }). Scope sites:write.
+     * @return array<string,mixed>
+     */
+    public function deleteCustomHostname(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/custom-hostnames/' . rawurlencode($id), $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
     // ── Accountant access grants (BC-0196 batch C) ──────────────────────────
     // List, request and revoke only. There is deliberately no approve method:
     // approval is the client admin's decision in the app.
