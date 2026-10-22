@@ -4049,6 +4049,138 @@ final class BrivioClient
         return $data;
     }
 
+    // ── Costs Management (PF-0310, ADR-0296) ────────────────────────────────
+    // Amounts are integer minor units of their currency. Lists are capped (500)
+    // and not paginated. SaaS cost subscriptions live under /costs/subscriptions,
+    // not /subscriptions (Stripe merchant billing).
+
+    /**
+     * Month overview: spend and forecast per currency, top services, SaaS subscriptions. Scope costs:read.
+     * @param array<string,mixed> $params period (YYYY-MM)
+     * @return array<string,mixed>
+     */
+    public function getCostsOverview(array $params = []): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/costs', $params)['data'];
+        return $data;
+    }
+
+    /**
+     * Usage of a month grouped by provider and service / sub-account / region. Scope costs:read.
+     * @param array<string,mixed> $params period (YYYY-MM), group_by (service|sub_account|region)
+     * @return list<array<string,mixed>>
+     */
+    public function listCostUsage(array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/costs/usage', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Cost data sources; credentials are never returned. Scope costs:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listCostConnectors(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/costs/connectors')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Cost budgets with the spend of the month and thresholds crossed. Scope costs:read.
+     * @param array<string,mixed> $params period (YYYY-MM)
+     * @return list<array<string,mixed>>
+     */
+    public function listCostBudgets(array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/costs/budgets', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Create a monthly cost budget (201, returns { id }). Scope costs:write.
+     * @param array<string,mixed> $input name, currency, limit_minor (required), company_id, scope, scope_value, soft_threshold_pcts, enabled
+     * @return array<string,mixed>
+     */
+    public function createCostBudget(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/costs/budgets', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a cost budget (returns { id, deleted }). Scope costs:write.
+     * @return array<string,mixed>
+     */
+    public function deleteCostBudget(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/costs/budgets/' . rawurlencode($id), $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * SaaS subscriptions tracked by hand, active first. Scope costs:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listCostSubscriptions(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/costs/subscriptions')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Record a SaaS subscription (201, returns { id }). Scope costs:write.
+     * @param array<string,mixed> $input company_id, vendor, amount_minor, currency (required), plan, cadence, next_renewal, notes
+     * @return array<string,mixed>
+     */
+    public function createCostSubscription(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/costs/subscriptions', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Pause or resume tracking a SaaS subscription (returns { id, active }). Scope costs:write.
+     * @return array<string,mixed>
+     */
+    public function updateCostSubscription(string $id, bool $active, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->patch('/costs/subscriptions/' . rawurlencode($id), ['active' => $active], $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a SaaS subscription (returns { id, deleted }). Scope costs:write.
+     * @return array<string,mixed>
+     */
+    public function deleteCostSubscription(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/costs/subscriptions/' . rawurlencode($id), $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Usage vs provider invoice per connector, month and currency. Scope costs:read.
+     * @param array<string,mixed> $params period (YYYY-MM); omit for all months, latest first
+     * @return list<array<string,mixed>>
+     */
+    public function listCostReconciliations(array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/costs/reconciliations', $params)['data'] ?? [];
+        return $data;
+    }
+
     // ── Accountant access grants (BC-0196 batch C) ──────────────────────────
     // List, request and revoke only. There is deliberately no approve method:
     // approval is the client admin's decision in the app.

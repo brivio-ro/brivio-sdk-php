@@ -954,6 +954,67 @@ final class BrivioClientTest extends TestCase
         self::assertSame('CANCELLED', $t->decodedBody()['status']);
     }
 
+    public function testCostsPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'c1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->getCostsOverview(['period' => '2026-09']);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/costs?period=2026-09', $t->url);
+
+        $client->listCostUsage(['period' => '2026-09', 'group_by' => 'region']);
+        self::assertStringStartsWith('https://api.example/v1/costs/usage', $t->url);
+        self::assertStringContainsString('group_by=region', $t->url);
+
+        $client->listCostConnectors();
+        self::assertSame('https://api.example/v1/costs/connectors', $t->url);
+
+        $client->listCostBudgets();
+        self::assertSame('https://api.example/v1/costs/budgets', $t->url);
+
+        $client->createCostBudget(['name' => 'Cloud', 'currency' => 'EUR', 'limit_minor' => 50000], 'cb-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/costs/budgets', $t->url);
+        self::assertSame(50000, $t->decodedBody()['limit_minor']);
+        self::assertSame('cb-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->deleteCostBudget('b 1', 'cb-2');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/costs/budgets/b%201', $t->url);
+        self::assertSame('cb-2', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listCostReconciliations(['period' => '2026-08']);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/costs/reconciliations?period=2026-08', $t->url);
+    }
+
+    public function testCostSubscriptionPathsAreNotMerchantSubscriptions(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 's1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listCostSubscriptions();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/costs/subscriptions', $t->url);
+
+        $client->createCostSubscription(['company_id' => 'c1', 'vendor' => 'Figma', 'amount_minor' => 1500, 'currency' => 'USD'], 'cs-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/costs/subscriptions', $t->url);
+        self::assertSame('Figma', $t->decodedBody()['vendor']);
+        self::assertSame('cs-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->updateCostSubscription('s 1', false, 'cs-2');
+        self::assertSame('PATCH', $t->method);
+        self::assertSame('https://api.example/v1/costs/subscriptions/s%201', $t->url);
+        self::assertSame(['active' => false], $t->decodedBody());
+        self::assertSame('cs-2', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->deleteCostSubscription('s1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/costs/subscriptions/s1', $t->url);
+    }
+
     public function testAccessGrantPathsAndNoApproveMethod(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'ag1'], 'error' => null]);
