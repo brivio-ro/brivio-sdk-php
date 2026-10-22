@@ -1052,6 +1052,47 @@ final class BrivioClientTest extends TestCase
         self::assertSame('cd-1', $t->headers['Idempotency-Key'] ?? null);
     }
 
+    public function testMailboxAndAliasPaths(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 'm1'], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listMailDomains();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/mail-domains', $t->url);
+
+        $client->listMailboxes();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/mailboxes', $t->url);
+
+        $client->createMailbox(['domain_id' => 'd1', 'local_part' => 'office'], 'mb-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/mailboxes', $t->url);
+        self::assertSame('office', $t->decodedBody()['local_part']);
+        self::assertSame('mb-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->deleteMailbox('m 1', 'md-1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/mailboxes/m%201', $t->url);
+        self::assertSame('md-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->listMailAliases(['mailbox_id' => 'm1']);
+        self::assertSame('GET', $t->method);
+        self::assertStringStartsWith('https://api.example/v1/mail-aliases', $t->url);
+        self::assertStringContainsString('mailbox_id=m1', $t->url);
+
+        $client->createMailAlias(['mailbox_id' => 'm1', 'alias_local_part' => 'sales'], 'al-1');
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/mail-aliases', $t->url);
+        self::assertSame('sales', $t->decodedBody()['alias_local_part']);
+        self::assertSame('al-1', $t->headers['Idempotency-Key'] ?? null);
+
+        $client->deleteMailAlias('a 1', 'ad-1');
+        self::assertSame('DELETE', $t->method);
+        self::assertSame('https://api.example/v1/mail-aliases/a%201', $t->url);
+        self::assertSame('ad-1', $t->headers['Idempotency-Key'] ?? null);
+    }
+
     public function testAccessGrantPathsAndNoApproveMethod(): void
     {
         $t = new FakeTransport(['data' => ['id' => 'ag1'], 'error' => null]);

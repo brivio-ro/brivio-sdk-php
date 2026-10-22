@@ -4375,6 +4375,91 @@ final class BrivioClient
         return (string) $id;
     }
 
+    // ── Hosted mailboxes and aliases (PF-0311 g2, ADR-0193) ─────────────────
+    // Organization mailboxes only (personal and HR employee mailboxes are
+    // never reachable). A mailbox password is generated and sealed
+    // server-side and NEVER returned. Not paginated.
+
+    /**
+     * The organization's hosted mail domains (read-only). Scope mailboxes:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listMailDomains(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/mail-domains')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * The organization's hosted mailboxes. Scope mailboxes:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listMailboxes(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/mailboxes')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Provision a hosted mailbox (returns { id, address, status } — never a password). Scope mailboxes:write.
+     * @param array<string,mixed> $input domain_id, local_part (required), display_name, quota_mb
+     * @return array<string,mixed>
+     */
+    public function createMailbox(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/mailboxes', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Delete a hosted mailbox (mail server first; returns { id, deleted }). Scope mailboxes:write.
+     * @return array<string,mixed>
+     */
+    public function deleteMailbox(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/mailboxes/' . rawurlencode($id), $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Aliases of the organization's mailboxes. Scope mailboxes:read.
+     * @param array<string,mixed> $params mailbox_id
+     * @return list<array<string,mixed>>
+     */
+    public function listMailAliases(array $params = []): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/mail-aliases', $params)['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Add an alias delivering into an organization mailbox (returns { id, address, mailbox_id }). Scope mailboxes:write.
+     * @param array<string,mixed> $input mailbox_id, alias_local_part (required)
+     * @return array<string,mixed>
+     */
+    public function createMailAlias(array $input, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/mail-aliases', $input, $idempotencyKey)['data'];
+        return $data;
+    }
+
+    /**
+     * Remove an alias (mail server first; returns { id, deleted }). Scope mailboxes:write.
+     * @return array<string,mixed>
+     */
+    public function deleteMailAlias(string $id, ?string $idempotencyKey = null): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->delete('/mail-aliases/' . rawurlencode($id), $idempotencyKey)['data'] ?? [];
+        return $data;
+    }
+
     // ── Accountant access grants (BC-0196 batch C) ──────────────────────────
     // List, request and revoke only. There is deliberately no approve method:
     // approval is the client admin's decision in the app.
