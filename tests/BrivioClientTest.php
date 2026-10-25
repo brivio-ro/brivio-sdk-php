@@ -433,6 +433,9 @@ final class BrivioClientTest extends TestCase
         self::assertSame('https://api.example/v1/saft/generations/g%201', $t->url);
         $client->listSaftGenerationFindings('g1');
         self::assertSame('https://api.example/v1/saft/generations/g1/findings', $t->url);
+        $client->listSaftGenerationSubmissions('g 1');
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/saft/generations/g%201/submissions', $t->url);
         $client->getSaftGenerationDownload('g1');
         self::assertSame('GET', $t->method);
         self::assertSame('https://api.example/v1/saft/generations/g1/download', $t->url);

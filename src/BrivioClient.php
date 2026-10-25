@@ -2683,6 +2683,19 @@ final class BrivioClient
     }
 
     /**
+     * The parts a SAF-T generation is filed as, in part order: section
+     * manifest, digest, upload index, recipisă link and status
+     * (draft|signed|submitted|accepted|rejected). Scope saft:read.
+     * @return array<string,mixed> {generation_id, submissions: list<array<string,mixed>>}
+     */
+    public function listSaftGenerationSubmissions(string $id): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/saft/generations/' . rawurlencode($id) . '/submissions')['data'];
+        return $data;
+    }
+
+    /**
      * Queue a SAF-T D406 generation on the worker (202). 409 when the
      * readiness pre-flight blocks or one is already running; 503 when no
      * worker is reachable. The API REQUIRES an Idempotency-Key — one is
