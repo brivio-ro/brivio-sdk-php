@@ -1057,7 +1057,7 @@ final class BrivioClient
     }
 
     /**
-     * PF-0311 g4 (ADR-0306): ORDER a domain registration or transfer. NOT a purchase: the order stays
+     * PF-0311 g4 (ADR-0308): ORDER a domain registration or transfer. NOT a purchase: the order stays
      * pending until an org admin confirms it in Brivio with a second factor (confirm_url). Never returns
      * the auth code. Scope domains:write.
      * @param array<string,mixed> $input kind, domain (required), period, auth_code
@@ -4439,7 +4439,7 @@ final class BrivioClient
         return (string) $id;
     }
 
-    // ── Store apps (PF-0402, ADR-0307) ──────────────────────────────────────
+    // ── Store apps (PF-0402, ADR-0309) ──────────────────────────────────────
     // A store's own Android app. Read-only: the build profile (its `generator`
     // object is what BRIVIO_STORE_PROFILE consumes) and the Play Data safety /
     // Apple privacy declaration. 404 when the store has no app.
