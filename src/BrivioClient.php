@@ -4268,6 +4268,101 @@ final class BrivioClient
         return $data;
     }
 
+    // ── AI assistant (AS-065, ADR-0307) ─────────────────────────────────────
+    // Threads belong to the person behind the key (its creator) or OAuth token.
+    // Runs are JSON only: this client does not stream; for Server-Sent Events
+    // use the TS SDK (`assistant.runs.stream`) or POST with `stream: true` from
+    // your own HTTP client. There is deliberately NO approve method: a run that
+    // wants to change something returns `pending_approvals`, each with an
+    // `approve_url` opening the Approval Feed in the Brivio app — the only
+    // place a person can approve it. Ids are positive integers.
+
+    /**
+     * The caller's API threads, newest first. Scope assistant:read.
+     * @param array<string, scalar|null> $params page, per_page
+     * @return array{data: list<array<string,mixed>>, meta: array<string,mixed>}
+     */
+    public function listAssistantThreads(array $params = []): array
+    {
+        $res = $this->http->get('/assistant/threads', $params);
+        /** @var list<array<string,mixed>> $data */
+        $data = $res['data'] ?? [];
+        return ['data' => $data, 'meta' => $res['meta'] ?? []];
+    }
+
+    /**
+     * Create an empty thread (201). Scope assistant:write.
+     * @param array<string,mixed> $input { title? (1..200) }
+     * @return array<string,mixed> { id, title, created_at, updated_at }
+     */
+    public function createAssistantThread(array $input = []): array
+    {
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/assistant/threads', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * A thread with its last 100 messages, oldest first. Scope assistant:read.
+     * @return array<string,mixed>
+     */
+    public function getAssistantThread(int $threadId): array
+    {
+        $id = self::positiveId('threadId', $threadId);
+        /** @var array<string,mixed> $data */
+        $data = $this->http->get('/assistant/threads/' . $id)['data'];
+        return $data;
+    }
+
+    /**
+     * Send a message and wait for the whole answer (JSON; no streaming in PHP).
+     * 402 budget/credit, 429 rate/concurrency, 404 thread. When `status` is
+     * `pending_approval`, approve each of `pending_approvals` in the Brivio app
+     * via its `approve_url` — never over the API. Scope assistant:write.
+     * @param array<string,mixed> $input { message (1..20000), locale? (ro|en) }
+     * @return array<string,mixed> { thread_id, status, text, pending_approvals, usage, ai_generated }
+     */
+    public function createAssistantRun(int $threadId, array $input): array
+    {
+        $id = self::positiveId('threadId', $threadId);
+        unset($input['stream']);
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/assistant/threads/' . $id . '/runs', $input)['data'];
+        return $data;
+    }
+
+    /**
+     * The caller's PENDING proposals from API threads (each with `approve_url`). Scope assistant:read.
+     * @return list<array<string,mixed>>
+     */
+    public function listAssistantProposals(): array
+    {
+        /** @var list<array<string,mixed>> $data */
+        $data = $this->http->get('/assistant/proposals')['data'] ?? [];
+        return $data;
+    }
+
+    /**
+     * Reject a pending proposal (returns { id, status: "rejected" }); 404 when it is
+     * no longer pending or not the caller's. Scope assistant:write.
+     * @return array<string,mixed>
+     */
+    public function rejectAssistantProposal(int $proposalId): array
+    {
+        $id = self::positiveId('proposalId', $proposalId);
+        /** @var array<string,mixed> $data */
+        $data = $this->http->post('/assistant/proposals/' . $id . '/reject', [])['data'];
+        return $data;
+    }
+
+    private static function positiveId(string $name, int $id): string
+    {
+        if ($id <= 0) {
+            throw new \InvalidArgumentException("Brivio SDK: {$name} must be a positive integer");
+        }
+        return (string) $id;
+    }
+
     // ── Accountant access grants (BC-0196 batch C) ──────────────────────────
     // List, request and revoke only. There is deliberately no approve method:
     // approval is the client admin's decision in the app.

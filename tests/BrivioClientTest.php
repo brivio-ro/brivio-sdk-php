@@ -1076,6 +1076,57 @@ final class BrivioClientTest extends TestCase
         }
     }
 
+    public function testAssistantPathsAndNoApproveMethod(): void
+    {
+        $t = new FakeTransport(['data' => ['id' => 7], 'error' => null, 'meta' => ['total' => 0]]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $client->listAssistantThreads(['page' => 2, 'per_page' => 10]);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/assistant/threads?page=2&per_page=10', $t->url);
+
+        $client->createAssistantThread(['title' => 'Facturi']);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/assistant/threads', $t->url);
+        self::assertSame('Facturi', $t->decodedBody()['title']);
+
+        $client->getAssistantThread(7);
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/assistant/threads/7', $t->url);
+
+        $client->createAssistantRun(7, ['message' => 'Salut', 'locale' => 'ro', 'stream' => true]);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/assistant/threads/7/runs', $t->url);
+        self::assertSame(['message' => 'Salut', 'locale' => 'ro'], $t->decodedBody());
+
+        $client->listAssistantProposals();
+        self::assertSame('GET', $t->method);
+        self::assertSame('https://api.example/v1/assistant/proposals', $t->url);
+
+        $client->rejectAssistantProposal(11);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/assistant/proposals/11/reject', $t->url);
+
+        foreach (get_class_methods($client) as $m) {
+            self::assertDoesNotMatchRegularExpression('/approve/i', $m);
+        }
+    }
+
+    public function testAssistantRejectsNonPositiveIdsBeforeAnyRequest(): void
+    {
+        $t = new FakeTransport(['data' => [], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+        foreach ([fn () => $client->getAssistantThread(0), fn () => $client->createAssistantRun(-1, ['message' => 'x']), fn () => $client->rejectAssistantProposal(0)] as $call) {
+            try {
+                $call();
+                self::fail('expected InvalidArgumentException');
+            } catch (\InvalidArgumentException $e) {
+                self::assertStringContainsString('must be a positive integer', $e->getMessage());
+            }
+        }
+        self::assertNull($t->url);
+    }
+
     public function testCreateMarketingSubscriberPostsBodyAndIdempotencyKey(): void
     {
         $t = new FakeTransport(['data' => ['id' => 's1', 'status' => 'pending', 'confirmation_sent' => true], 'error' => null], 201);

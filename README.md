@@ -109,6 +109,18 @@ $nir   = $brivio->getNirDocument($nirs['data'][0]['id']);      // with line item
 $staff = $brivio->listEmployees(['department' => 'Vanzari']);  // PII never exposed
 ```
 
+AI assistant (scopes `assistant:read` / `assistant:write`; integer ids). JSON
+only — this client does not stream; use the TS SDK or your own HTTP client with
+`stream: true` for Server-Sent Events. There is no approve method: approve each
+of `pending_approvals` in the Brivio app via its `approve_url`.
+
+```php
+$thread  = $brivio->createAssistantThread(['title' => 'Încasări']);
+$run     = $brivio->createAssistantRun($thread['id'], ['message' => 'Ce facturi am neîncasate?', 'locale' => 'ro']);
+$pending = $brivio->listAssistantProposals();                  // each has approve_url (app only)
+$brivio->rejectAssistantProposal($pending[0]['id']);
+```
+
 ## API surfaces
 
 Two backends serve the API behind the same key. Core data resources
