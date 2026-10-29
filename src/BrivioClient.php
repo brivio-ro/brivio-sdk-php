@@ -4276,6 +4276,18 @@ final class BrivioClient
     // wants to change something returns `pending_approvals`, each with an
     // `approve_url` opening the Approval Feed in the Brivio app — the only
     // place a person can approve it. Ids are positive integers.
+    //
+    // AS-089: subscribe a webhook to the two event names below to learn about
+    // proposals without polling. `data` carries proposal_id, thread_id,
+    // user_id, tool, created_at and expires_at + approve_url (created) or
+    // resolution approved|failed|rejected|expired + resolved_at (resolved);
+    // never the tool input. Verify deliveries with verifyStandardWebhook().
+
+    /** Webhook event: a proposal from an API assistant thread awaits approval. */
+    public const EVENT_ASSISTANT_PROPOSAL_CREATED = 'assistant.proposal.created';
+
+    /** Webhook event: that proposal was approved, failed, rejected or expired. */
+    public const EVENT_ASSISTANT_PROPOSAL_RESOLVED = 'assistant.proposal.resolved';
 
     /**
      * The caller's API threads, newest first. Scope assistant:read.
