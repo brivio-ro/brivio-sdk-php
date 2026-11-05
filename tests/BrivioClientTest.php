@@ -539,9 +539,16 @@ final class BrivioClientTest extends TestCase
         $client->listProspectingSavedSearches();
         self::assertSame('GET', $t->method);
         self::assertSame('https://api.example/v1/prospecting/saved-searches', $t->url);
-        $client->createProspectingSavedSearch(['name' => 'IT Cluj', 'filters' => ['county' => 'CJ']]);
+        $filters = ['groups' => [
+            ['field' => 'caenSection', 'values' => ['62']],
+            ['field' => 'county', 'values' => ['CLUJ']],
+            ['field' => 'legalForm', 'values' => ['PFA', 'II'], 'exclude' => true],
+        ]];
+        $client->createProspectingSavedSearch(['name' => 'IT Cluj', 'filters' => $filters]);
         self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/prospecting/saved-searches', $t->url);
         self::assertSame('IT Cluj', $t->decodedBody()['name']);
+        self::assertSame($filters, $t->decodedBody()['filters']);
         $client->getProspectingSavedSearch('s1');
         self::assertSame('GET', $t->method);
         self::assertSame('https://api.example/v1/prospecting/saved-searches/s1', $t->url);
@@ -551,6 +558,34 @@ final class BrivioClientTest extends TestCase
         $client->deleteProspectingSavedSearch('s1');
         self::assertSame('DELETE', $t->method);
         self::assertSame('https://api.example/v1/prospecting/saved-searches/s1', $t->url);
+    }
+
+    public function testCompanySearchSendsFilterGroupsAndCompactParams(): void
+    {
+        $t = new FakeTransport(['data' => ['results' => [], 'pagination' => ['total' => 0]], 'error' => null]);
+        $client = new BrivioClient('k', 'https://api.example/v1', $t);
+
+        $request = [
+            'groups' => [
+                ['field' => 'status', 'values' => ['1048']],
+                ['field' => 'ageYears', 'range' => ['min' => 5]],
+                ['field' => 'hasEFactura', 'value' => true],
+                ['field' => 'trend', 'trend' => 'revenueCagr', 'window' => 3, 'minPct' => 10],
+                ['field' => 'county', 'values' => ['BUCUREȘTI'], 'exclude' => true],
+            ],
+            'sort' => 'employeesAsc',
+            'pageSize' => 50,
+        ];
+        $client->searchCompanies($request);
+        self::assertSame('POST', $t->method);
+        self::assertSame('https://api.example/v1/companies/search', $t->url);
+        self::assertSame($request, $t->decodedBody());
+
+        $client->searchCompaniesGet(['jud' => 'CLUJ,!BIHOR', 'stare' => '1048', 'efact' => '1', 'n' => 25]);
+        self::assertSame('GET', $t->method);
+        $query = [];
+        parse_str((string) parse_url((string) $t->url, PHP_URL_QUERY), $query);
+        self::assertSame(['jud' => 'CLUJ,!BIHOR', 'stare' => '1048', 'efact' => '1', 'n' => '25'], $query);
     }
 
     public function testFleetPaths(): void

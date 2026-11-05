@@ -13,6 +13,21 @@ namespace Brivio;
  * $contacts = $brivio->listContacts(['search' => 'srl']);
  * $contact = $brivio->createContact(['name' => 'ACME SRL', 'vat_number' => 'RO123']);
  * ```
+ *
+ * Prospectare filter model (POST /companies/search, saved searches): AND
+ * between groups, OR within a group's values, `exclude: true` negates a group.
+ *
+ * @phpstan-type CompanyRange array{min?: int|float, max?: int|float}
+ * @phpstan-type CompanyFilterGroup array{field: 'text', query: string, exclude?: bool}
+ *     |array{field: 'caen'|'caenSection'|'county'|'city'|'status'|'legalForm'|'workPointCounty', values: list<string>, exclude?: bool}
+ *     |array{field: 'foundedYear'|'ageYears'|'shareCapital'|'workPointsCount', range: CompanyRange, exclude?: bool}
+ *     |array{field: 'hasEmail'|'hasPhone'|'hasWebsite'|'hasVat'|'hasEFactura'|'hasWorkPoints'|'isClaimed', value: bool, exclude?: bool}
+ *     |array{field: 'administratorName', query: string, ownershipPct?: CompanyRange, exclude?: bool}
+ *     |array{field: 'financial', indicator: 'revenue'|'netProfit'|'employees'|'equity'|'totalDebts'|'fixedAssets'|'currentAssets', year?: 'latest'|int, range: CompanyRange, exclude?: bool}
+ *     |array{field: 'trend', trend: 'revenueGrowthYears'|'profitableYears'|'employeesGrowing'|'debtDecreasing', years: int, exclude?: bool}
+ *     |array{field: 'trend', trend: 'revenueCagr', window: 3|5, minPct: int|float, exclude?: bool}
+ *     |array{field: 'trend', trend: 'debtToEquity', max: int|float, exclude?: bool}
+ * @phpstan-type CompanySort 'relevance'|'name'|'nameDesc'|'revenue'|'revenueAsc'|'employees'|'employeesAsc'|'foundedNewest'|'foundedOldest'
  */
 final class BrivioClient
 {
@@ -38,11 +53,23 @@ final class BrivioClient
 
     // ── Companies (public registry / Prospectare) ─────────────────────
     /**
-     * Advanced registry search: filter ~2M Romanian companies by CAEN,
-     * county, size, financials and multi-year trends. AND between filter
-     * groups, OR within a group. Scope: companies:read.
+        * Advanced registry search: filter ~2M Romanian companies by CAEN,
+        * county, city, status, legal form, age, capital, work points, data
+        * flags, administrators, financials and multi-year trends — every filter
+        * of the /prospecting page. AND between filter groups, OR within a group,
+        * `exclude: true` negates a group. Scope: companies:read.
+        *
+        * ```php
+        * $brivio->searchCompanies(['groups' => [
+        *     ['field' => 'caenSection', 'values' => ['62']],
+        *     ['field' => 'county', 'values' => ['CLUJ']],
+        *     ['field' => 'status', 'values' => ['active']],        // bucket: în funcțiune
+        *     ['field' => 'legalForm', 'values' => ['PFA', 'II'], 'exclude' => true],
+        *     ['field' => 'financial', 'indicator' => 'employees', 'year' => 'latest', 'range' => ['min' => 10]],
+        * ], 'sort' => 'revenue', 'pageSize' => 25]);
+        * ```
      *
-     * @param array{groups: list<array<string,mixed>>, sort?: string, page?: int, pageSize?: int, stats?: bool} $request
+        * @param array{groups: list<CompanyFilterGroup>, sort?: CompanySort, page?: int, pageSize?: int, stats?: bool} $request
      * @return array{results: list<array<string,mixed>>, pagination: array<string,mixed>, stats?: array<string,mixed>}
      */
     public function searchCompanies(array $request): array
@@ -1725,9 +1752,18 @@ final class BrivioClient
     }
 
     /**
-     * GET variant of the registry search for simple filters passed as query parameters (the POST variant takes structured groups). Scope: companies:read.
+        * GET variant of the registry search: the compact /prospecting URL codec,
+        * so a shared /prospecting query string works verbatim. One parameter per
+        * filter, comma-separated values ORed, a leading `!` on a value excludes it.
+        * Params: q, caen, sect, jud (county), loc (city), stare (ONRC status code),
+        * forma (legal form), pl (work-point county), an (founding year), vech
+        * (age), cap (share capital), nrpl (work points) — ranges `min-max`;
+        * email, tel, web, tva, efact, arepl, revend — '1'|'0'; fin
+        * (`indicator:year:min-max`), trend (`profitableYears:3`, `revenueCagr:3:10`),
+        * adm (`name[:pctMin-pctMax]`), sort, p, n (default 25, max 200), stats ('true').
+        * Scope: companies:read.
      *
-     * @param array<string, scalar|null> $params
+        * @param array{q?: string, caen?: string, sect?: string, jud?: string, loc?: string, stare?: string, forma?: string, pl?: string, an?: string, vech?: string, cap?: string, nrpl?: string, email?: '0'|'1', tel?: '0'|'1', web?: '0'|'1', tva?: '0'|'1', efact?: '0'|'1', arepl?: '0'|'1', revend?: '0'|'1', fin?: string, trend?: string, adm?: string, sort?: CompanySort, p?: int, n?: int, stats?: 'true'} $params
      * @return array<string,mixed>|list<array<string,mixed>>
      */
     public function searchCompaniesGet(array $params = []): array
@@ -2993,7 +3029,7 @@ final class BrivioClient
      * Save a prospecting search (201). Counts toward the plan limit (402
      * PLAN_LIMIT_EXCEEDED); attributed to the user who created the API key
      * (403 when there is none). Scope prospecting:write.
-     * @param array<string,mixed> $input
+    * @param array{name: string, filters: array{groups: list<CompanyFilterGroup>}, sort?: CompanySort, columns?: list<string>, notify_in_app?: bool, notify_email?: bool} $input
      * @return array<string,mixed>
      */
     public function createProspectingSavedSearch(array $input, ?string $idempotencyKey = null): array
@@ -3006,7 +3042,7 @@ final class BrivioClient
     /**
      * Update name, filters, sort, columns or alert flags; last_* fields are
      * read-only. Scope prospecting:write.
-     * @param array<string,mixed> $input
+    * @param array{name?: string, filters?: array{groups: list<CompanyFilterGroup>}, sort?: CompanySort, columns?: list<string>, notify_in_app?: bool, notify_email?: bool} $input
      * @return array<string,mixed>
      */
     public function updateProspectingSavedSearch(string $id, array $input, ?string $idempotencyKey = null): array
