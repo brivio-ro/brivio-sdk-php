@@ -140,6 +140,44 @@ The `\Brivio\Legacy\*` classes accept the **same payload shape** as the original
 provider and translate it to Brivio. In most cases you only change the
 constructor and the namespace.
 
+### What a shim call does on the wire
+
+Every shim invoice is translated to the **native** `POST /invoices` body
+(`InvoiceCreate` in the OpenAPI spec) in two steps:
+
+1. **Buyer upsert:** `GET /contacts?external_id=…` and, only when nothing
+   matches, `POST /contacts` with that `external_id`. The id is derived from
+   the buyer (`legacy:cui:<digits>` for a Romanian CUI), so the same company
+   sent twice, or through two shims, stays one contact.
+2. **Invoice:** `POST /invoices` with `contact_external_id`, `series`,
+   `issue_date` / `due_date` (ISO; `DD.MM.YYYY` is accepted and converted;
+   both default to today in Bucharest) and `items[]` with **net** unit prices
+   (a VAT-inclusive vendor price is converted). The invoice is created as a
+   **DRAFT**.
+
+Rules worth knowing:
+
+- **RO VAT prefix:** the buyer's CUI is sent as `RO<cif>` only when the vendor
+  payload says the buyer is a VAT payer — SmartBill `client.isTaxPayer`, Oblio
+  `client.vatPayer`, FGO `Client.PlatitorTVA`, Facturis `client_platitor_tva`.
+  Explicitly not a payer → bare digits. No flag at all → the code is kept as
+  you typed it. CNPs and foreign VAT codes pass through unchanged.
+- **Foreign currency:** no exchange rate is defaulted; omit it and the server
+  applies the BNR rate for the issue date. A positive rate you pass is kept.
+- **Several companies in one organisation:** the seller CIF in the vendor
+  payload (`companyVatCode`, `cif`, `setCif`, `setCui`) is not used to pick the
+  issuer; call `$shim->useCompany($companyId)` instead.
+- **e-Factura / SPV flags** (`spvExtern`, `trimite_efactura`) are not acted on:
+  issue and submit with the native client —
+  `$shim->client()->sendInvoice($id)` then `submitInvoiceToANAF($id)`.
+- **Discount lines** (SmartBill `isDiscount`, negative prices) are refused
+  before any request; put the discounted price on the product line.
+
+The shims call the native endpoints rather than `/compat/oblio` and
+`/compat/smartbill`: those server translators match buyers by VAT number or
+name and number documents outside the app's series allocator, while the
+native route applies the full set of fiscal checks.
+
 ### SmartBill
 
 ```php

@@ -11,7 +11,12 @@ use Brivio\BrivioClient;
  * (facturis-online.ro/api). Mirrors Facturis' method names (saveInvoice,
  * listInvoices, saveClient, saveProduct) and snake_case payload
  * (client_name, client_cui, products[] with denumire/pret/cota_tva) and maps
- * them to Brivio's canonical `/v1` API.
+ * them to Brivio's native `/v1` API (buyer upserted via `/contacts` +
+ * `external_id`, then `POST /invoices` with `contact_external_id` — see
+ * NativeInvoiceBody). `client_platitor_tva` decides whether the CUI is sent
+ * as `RO<cif>` or bare digits. `trimite_efactura` is not honoured here: the
+ * invoice is created as a DRAFT; issue it and submit it with the native
+ * client() (`sendInvoice`, then `submitInvoiceToANAF`).
  *
  * Facturis original (REST, POST to save_invoice.php):
  *   $data = [
@@ -28,6 +33,8 @@ use Brivio\BrivioClient;
  */
 final class Facturis
 {
+    use NativeInvoiceBody;
+
     private BrivioClient $brivio;
     private ?string $cif = null;
 
@@ -47,6 +54,12 @@ final class Facturis
         $this->cif = $cui;
     }
 
+    /** The CUI set with setCui() (informational; the API issues as the org's company). */
+    public function getCui(): ?string
+    {
+        return $this->cif;
+    }
+
     /**
      * Facturis: save_invoice / saveInvoice.
      *
@@ -55,19 +68,18 @@ final class Facturis
      */
     public function saveInvoice(array $data): array
     {
-        return $this->brivio->createInvoice($this->mapInvoice($data));
+        return $this->createNativeInvoice($this->mapClient($data), $this->mapDocument($data, 'INVOICE'));
     }
 
-    /** Facturis: save_proforma. */
     /**
+     * Facturis: save_proforma.
+     *
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
     public function saveProforma(array $data): array
     {
-        $invoice = $this->mapInvoice($data);
-        $invoice['kind'] = 'proforma';
-        return $this->brivio->createInvoice($invoice);
+        return $this->createNativeInvoice($this->mapClient($data), $this->mapDocument($data, 'PROFORMA'));
     }
 
     /**
@@ -81,23 +93,15 @@ final class Facturis
     }
 
     /**
-     * Facturis: save_client / saveClient.
+     * Facturis: save_client / saveClient. Idempotent: an existing contact with
+     * the same derived `external_id` is returned as is.
      *
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
     public function saveClient(array $data): array
     {
-        return $this->brivio->createContact([
-            'name' => $data['client_name'] ?? $data['nume'] ?? '',
-            'vat_number' => $data['client_cui'] ?? $data['cui'] ?? null,
-            'registration_number' => $data['client_rc'] ?? $data['nr_reg_com'] ?? null,
-            'email' => $data['client_email'] ?? $data['email'] ?? null,
-            'phone' => $data['client_telefon'] ?? $data['telefon'] ?? null,
-            'address' => $data['client_adresa'] ?? $data['adresa'] ?? null,
-            'city' => $data['client_oras'] ?? $data['oras'] ?? null,
-            'county' => $data['client_judet'] ?? $data['judet'] ?? null,
-        ]);
+        return $this->upsertNativeContact($this->nativeContactBody($this->mapClient($data)));
     }
 
     /**
@@ -121,41 +125,51 @@ final class Facturis
      * @param array<string,mixed> $p
      * @return array<string,mixed>
      */
-    private function mapInvoice(array $p): array
+    private function mapClient(array $p): array
+    {
+        return [
+            'name' => (string) ($p['client_name'] ?? $p['client_nume'] ?? $p['nume'] ?? ''),
+            'vat_code' => $p['client_cui'] ?? $p['cui'] ?? null,
+            'vat_payer' => self::flag($p['client_platitor_tva'] ?? $p['platitor_tva'] ?? null),
+            'registration_number' => $p['client_rc'] ?? $p['nr_reg_com'] ?? null,
+            'email' => $p['client_email'] ?? $p['email'] ?? null,
+            'phone' => $p['client_telefon'] ?? $p['telefon'] ?? null,
+            'street' => $p['client_adresa'] ?? $p['adresa'] ?? null,
+            'city' => $p['client_oras'] ?? $p['oras'] ?? null,
+            'county' => $p['client_judet'] ?? $p['judet'] ?? null,
+            'country' => $p['client_tara'] ?? $p['tara'] ?? null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $p
+     * @return array<string,mixed>
+     */
+    private function mapDocument(array $p, string $type): array
     {
         /** @var list<FacturisProduct> $products */
         $products = is_array($p['products'] ?? null) ? $p['products'] : [];
 
         $lines = array_map(static function (array $row): array {
             return [
-                'name' => $row['denumire'] ?? $row['nume'] ?? '',
-                'quantity' => (float) ($row['cantitate'] ?? 1),
-                'unit_price' => (float) ($row['pret'] ?? 0),
-                'vat_rate' => (float) ($row['cota_tva'] ?? 0),
-                'vat_included' => (bool) ($row['tva_inclus'] ?? false),
-                'unit' => $row['um'] ?? 'buc',
-                'is_service' => ($row['tip'] ?? null) === 'serviciu',
+                'description' => (string) ($row['denumire'] ?? $row['nume'] ?? ''),
+                'quantity' => $row['cantitate'] ?? 1,
+                'unit_price' => $row['pret'] ?? 0,
+                'vat_rate' => $row['cota_tva'] ?? null,
+                'vat_included' => self::flag($row['tva_inclus'] ?? null) ?? false,
+                'unit' => $row['um'] ?? null,
             ];
         }, $products);
 
         return [
-            'seller_vat_code' => $p['firma_cui'] ?? $this->cif,
-            'client' => [
-                'name' => $p['client_name'] ?? $p['client_nume'] ?? '',
-                'vat_number' => $p['client_cui'] ?? null,
-                'registration_number' => $p['client_rc'] ?? null,
-                'email' => $p['client_email'] ?? null,
-                'address' => $p['client_adresa'] ?? null,
-                'city' => $p['client_oras'] ?? null,
-                'county' => $p['client_judet'] ?? null,
-                'save' => (bool) ($p['salveaza_client'] ?? false),
-            ],
-            'series_name' => $p['serie'] ?? null,
+            'type' => $type,
+            'series' => $p['serie'] ?? null,
             'issue_date' => $p['data_factura'] ?? $p['date_invoice'] ?? null,
             'due_date' => $p['data_scadenta'] ?? null,
-            'currency' => $p['moneda'] ?? 'RON',
+            'currency' => $p['moneda'] ?? null,
+            'exchange_rate' => $p['curs_valutar'] ?? null,
+            'notes' => $p['observatii'] ?? $p['mentiuni'] ?? null,
             'lines' => $lines,
-            'send_to_spv' => (bool) ($p['trimite_efactura'] ?? $p['e_factura'] ?? false),
         ];
     }
 }

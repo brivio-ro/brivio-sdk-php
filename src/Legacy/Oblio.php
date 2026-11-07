@@ -9,8 +9,15 @@ use Brivio\BrivioClient;
 /**
  * Drop-in compatibility shim for code written against the Oblio API
  * (oblio.eu/api). Mirrors Oblio's method names (createInvoice, nomenclature)
- * and payload (cif, client{}, products[]) and maps them to Brivio's canonical
- * `/v1` API.
+ * and payload (cif, client{}, products[]) and maps them to Brivio's native
+ * `/v1` API (buyer upserted via `/contacts` + `external_id`, then
+ * `POST /invoices` with `contact_external_id` — see NativeInvoiceBody).
+ *
+ * `cif` / setCif() is kept for source compatibility only: the API identifies
+ * the issuing company by id — call useCompany($companyId) when the
+ * organisation has more than one. `spvExtern` is not honoured here: the
+ * invoice is created as a DRAFT; issue it (`sendInvoice`) and then
+ * `submitInvoiceToANAF` on the native client().
  *
  * Oblio original (obliosoftware/oblio-api):
  *   $api = new \OblioSoftware\Api($email, $secret);
@@ -26,6 +33,8 @@ use Brivio\BrivioClient;
  */
 final class Oblio
 {
+    use NativeInvoiceBody;
+
     private BrivioClient $brivio;
     private ?string $cif = null;
 
@@ -44,6 +53,12 @@ final class Oblio
         $this->cif = $cif;
     }
 
+    /** The CIF set with setCif() (informational; the API issues as the org's company). */
+    public function getCif(): ?string
+    {
+        return $this->cif;
+    }
+
     /**
      * Oblio: createInvoice($data).
      *
@@ -52,7 +67,7 @@ final class Oblio
      */
     public function createInvoice(array $data): array
     {
-        return $this->brivio->createInvoice($this->mapInvoice($data));
+        return $this->createNativeInvoice($this->mapClient($data), $this->mapDocument($data, 'INVOICE'));
     }
 
     /**
@@ -63,9 +78,7 @@ final class Oblio
      */
     public function createProforma(array $data): array
     {
-        $invoice = $this->mapInvoice($data);
-        $invoice['kind'] = 'proforma';
-        return $this->brivio->createInvoice($invoice);
+        return $this->createNativeInvoice($this->mapClient($data), $this->mapDocument($data, 'PROFORMA'));
     }
 
     /**
@@ -87,38 +100,53 @@ final class Oblio
      * @param array<string,mixed> $p
      * @return array<string,mixed>
      */
-    private function mapInvoice(array $p): array
+    private function mapClient(array $p): array
     {
         /** @var array<string,mixed> $client */
         $client = is_array($p['client'] ?? null) ? $p['client'] : [];
+        return [
+            'name' => (string) ($client['name'] ?? ''),
+            'vat_code' => $client['cif'] ?? null,
+            'vat_payer' => self::flag($client['vatPayer'] ?? null),
+            'registration_number' => $client['rc'] ?? null,
+            'email' => $client['email'] ?? null,
+            'phone' => $client['phone'] ?? null,
+            'street' => $client['address'] ?? null,
+            'city' => $client['city'] ?? null,
+            'county' => $client['state'] ?? null,
+            'country' => $client['country'] ?? null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $p
+     * @return array<string,mixed>
+     */
+    private function mapDocument(array $p, string $type): array
+    {
         /** @var list<OblioProduct> $products */
         $products = is_array($p['products'] ?? null) ? $p['products'] : [];
 
         $lines = array_map(static function (array $row): array {
             return [
-                'name' => $row['name'] ?? '',
-                'quantity' => (float) ($row['quantity'] ?? 1),
-                'unit_price' => (float) ($row['price'] ?? 0),
-                'vat_rate' => (float) ($row['vatPercentage'] ?? 0),
-                'vat_included' => (bool) ($row['vatIncluded'] ?? false),
-                'unit' => $row['measuringUnit'] ?? 'buc',
-                'is_service' => ($row['productType'] ?? null) === 'Serviciu',
+                'description' => (string) ($row['name'] ?? ''),
+                'quantity' => $row['quantity'] ?? 1,
+                'unit_price' => $row['price'] ?? 0,
+                'vat_rate' => $row['vatPercentage'] ?? null,
+                'vat_included' => self::flag($row['vatIncluded'] ?? null) ?? false,
+                'unit' => $row['measuringUnit'] ?? null,
             ];
         }, $products);
 
         return [
-            'seller_vat_code' => $p['cif'] ?? $this->cif,
-            'client' => [
-                'name' => $client['name'] ?? '',
-                'vat_number' => $client['cif'] ?? null,
-                'registration_number' => $client['rc'] ?? null,
-                'vat_payer' => (bool) ($client['vatPayer'] ?? false),
-                'save' => (bool) ($client['save'] ?? false),
-            ],
-            'series_name' => $p['seriesName'] ?? null,
-            'currency' => $p['currency'] ?? 'RON',
+            'type' => $type,
+            'series' => $p['seriesName'] ?? null,
+            'issue_date' => $p['issueDate'] ?? null,
+            'due_date' => $p['dueDate'] ?? null,
+            'currency' => $p['currency'] ?? null,
+            'exchange_rate' => $p['exchangeRate'] ?? null,
+            'notes' => $p['mentions'] ?? null,
             'lines' => $lines,
-            'send_to_spv' => (bool) ($p['spvExtern'] ?? false),
         ];
     }
 }

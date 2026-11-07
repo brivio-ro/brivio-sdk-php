@@ -9,8 +9,9 @@ use Brivio\BrivioClient;
 /**
  * Drop-in compatibility shim for code written against the SmartBill Cloud REST
  * API. Mirrors SmartBill's resource/method names and request shape, translating
- * to Brivio's canonical `/v1` API so existing integrations migrate with minimal
- * changes.
+ * to Brivio's native `/v1` API (buyer upserted via `/contacts` with an
+ * `external_id`, then `POST /invoices` with `contact_external_id` — see
+ * NativeInvoiceBody) so existing integrations migrate with minimal changes.
  *
  * SmartBill original:
  *   $client = new \SmartBill\Client($email, $token);
@@ -24,6 +25,8 @@ use Brivio\BrivioClient;
  */
 final class SmartBill
 {
+    use NativeInvoiceBody;
+
     private BrivioClient $brivio;
 
     public function __construct(string $apiKey, string $baseUrl = 'https://api.brivio.ro/v1', ?callable $transport = null)
@@ -37,15 +40,15 @@ final class SmartBill
     }
 
     /**
-     * SmartBill: POST /invoice. Accepts the SmartBill invoice payload and maps
-     * it to Brivio's canonical invoice.
+     * SmartBill: POST /invoice. Accepts the SmartBill invoice payload and
+     * creates a DRAFT native invoice.
      *
      * @param array<string,mixed> $payload
      * @return array<string,mixed>
      */
     public function createInvoice(array $payload): array
     {
-        return $this->brivio->createInvoice($this->mapInvoice($payload));
+        return $this->createNativeInvoice($this->mapClient($payload), $this->mapDocument($payload, 'INVOICE'));
     }
 
     /**
@@ -56,57 +59,66 @@ final class SmartBill
      */
     public function createEstimate(array $payload): array
     {
-        $invoice = $this->mapInvoice($payload);
-        $invoice['kind'] = 'proforma';
-        return $this->brivio->createInvoice($invoice);
+        return $this->createNativeInvoice($this->mapClient($payload), $this->mapDocument($payload, 'PROFORMA'));
     }
 
     /**
-     * Map a SmartBill invoice/estimate payload to the Brivio canonical shape.
-     *
      * @param array<string,mixed> $p
      * @return array<string,mixed>
      */
-    private function mapInvoice(array $p): array
+    private function mapClient(array $p): array
     {
         /** @var array<string,mixed> $client */
         $client = is_array($p['client'] ?? null) ? $p['client'] : [];
+        return [
+            'name' => (string) ($client['name'] ?? ''),
+            'vat_code' => $client['vatCode'] ?? null,
+            'vat_payer' => self::flag($client['isTaxPayer'] ?? null),
+            'registration_number' => $client['regCom'] ?? null,
+            'email' => $client['email'] ?? null,
+            'phone' => $client['phone'] ?? null,
+            'street' => $client['address'] ?? null,
+            'city' => $client['city'] ?? null,
+            'county' => $client['county'] ?? null,
+            'country' => $client['country'] ?? null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $p
+     * @return array<string,mixed>
+     */
+    private function mapDocument(array $p, string $type): array
+    {
         /** @var list<SmartBillProduct> $products */
         $products = is_array($p['products'] ?? null) ? $p['products'] : [];
 
-        $lines = array_map(static function (array $row): array {
-            return [
-                'name' => $row['name'] ?? '',
-                'code' => $row['code'] ?? null,
-                'quantity' => (float) ($row['quantity'] ?? 1),
-                'unit_price' => (float) ($row['price'] ?? 0),
-                'vat_rate' => (float) ($row['taxPercentage'] ?? 0),
-                'vat_included' => (bool) ($row['isTaxIncluded'] ?? false),
-                'unit' => $row['measuringUnitName'] ?? 'buc',
-                'is_service' => (bool) ($row['isService'] ?? false),
-                'is_discount' => (bool) ($row['isDiscount'] ?? false),
+        $lines = [];
+        foreach ($products as $i => $row) {
+            if (self::flag($row['isDiscount'] ?? null) === true) {
+                throw new \InvalidArgumentException(
+                    "Brivio SmartBill shim: product {$i} is a discount line (isDiscount); "
+                    . 'discount lines are not supported, put the discounted price on the product instead',
+                );
+            }
+            $lines[] = [
+                'description' => (string) ($row['name'] ?? ''),
+                'quantity' => $row['quantity'] ?? 1,
+                'unit_price' => $row['price'] ?? 0,
+                'vat_rate' => $row['taxPercentage'] ?? null,
+                'vat_included' => self::flag($row['isTaxIncluded'] ?? null) ?? false,
+                'unit' => $row['measuringUnitName'] ?? null,
             ];
-        }, $products);
+        }
 
         return [
-            'seller_vat_code' => $p['companyVatCode'] ?? null,
-            'client' => [
-                'name' => $client['name'] ?? '',
-                'vat_number' => $client['vatCode'] ?? null,
-                'address' => $client['address'] ?? null,
-                'city' => $client['city'] ?? null,
-                'county' => $client['county'] ?? null,
-                'country' => $client['country'] ?? 'RO',
-                'vat_payer' => (bool) ($client['isTaxPayer'] ?? false),
-                'save' => (bool) ($client['saveToDb'] ?? false),
-            ],
-            'series_name' => $p['seriesName'] ?? null,
+            'type' => $type,
+            'series' => $p['seriesName'] ?? null,
             'issue_date' => $p['issueDate'] ?? null,
             'due_date' => $p['dueDate'] ?? null,
-            'currency' => $p['currency'] ?? 'RON',
+            'currency' => $p['currency'] ?? null,
             'exchange_rate' => $p['exchangeRate'] ?? null,
-            'language' => $p['language'] ?? 'RO',
-            'use_stock' => (bool) ($p['useStock'] ?? false),
+            'notes' => $p['mentions'] ?? null,
             'lines' => $lines,
         ];
     }
